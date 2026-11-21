@@ -95,6 +95,8 @@ fn leafType(s: *const Statement) ?*TypeStmt {
 pub const PreparedSchema = struct {
     active_stmts: std.AutoHashMapUnmanaged(*const Statement, bool) = .empty,
     list_keys: std.AutoHashMapUnmanaged(*const Statement, []const []const u8) = .empty,
+    needs_xpath_ctx: std.AutoHashMapUnmanaged(*const Statement, bool) = .empty,
+    child_index: schema_nav.Index = .{},
 };
 
 const Location = struct {
@@ -119,6 +121,8 @@ pub const DocumentValidator = struct {
     keys: *rfc7951.MemberKeys,
     errors: std.ArrayList(ValidationError) = .empty,
     prepared: PreparedSchema = .{},
+    /// Debug counter excludes the root and XPath evaluator allocations.
+    xpath_steps: usize = 0,
     /// The XPath root: the canonical data under the module.
     root: *const XNode = undefined,
     case_stack: std.ArrayList(*Statement) = .empty,
@@ -137,6 +141,11 @@ pub const DocumentValidator = struct {
         try self.errors.append(self.a, .{ .path = path, .pointer = pointer, .code = code, .message = message, .expression = expression });
     }
 
+    fn stepNode(self: *DocumentValidator, parent: *const XNode, data: Val, s: *Statement) error{OutOfMemory}!*const XNode {
+        if (builtin.mode == .debug) self.xpath_steps += 1;
+        return parent.step(self.a, data, .{ .stmt = s });
+    }
+
     fn context(self: *const DocumentValidator, node: *const XNode) xpath.Context {
         return .{ .current = node, .root = self.root };
     }
@@ -145,7 +154,7 @@ pub const DocumentValidator = struct {
     /// AST or its evaluation raises.
     fn evalExpr(self: *DocumentValidator, e: ?*xpath.Expr, node: *const XNode) error{OutOfMemory}!?bool {
         const expr = e orelse return null;
-        var ev: xpath.Evaluator = .{ .a = self.a };
+        var ev: xpath.Evaluator = .{ .a = self.a, .schema_index = &self.prepared.child_index };
         const v = ev.eval(expr, self.context(node), node) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.XPathEval => return null,
@@ -182,24 +191,45 @@ pub const DocumentValidator = struct {
         while (it.next()) |keys| self.a.free(keys.*);
         self.prepared.list_keys.deinit(self.a);
         self.prepared.active_stmts.deinit(self.a);
+        self.prepared.needs_xpath_ctx.deinit(self.a);
+        self.prepared.child_index.deinit(self.a);
+        self.checker.schema_index = null;
         self.prepared = .{};
     }
 
-    fn prepareChildren(self: *DocumentValidator, children: []const *Statement) Error!void {
+    // Derived and union types are conservative: they can resolve to a leafref or
+    // instance-identifier, including through typedefs in another module.
+    fn typeNeedsXPath(t: *const TypeStmt) bool {
+        if (t.prefix != null) return true;
+        const spec = registry.get(t.name) orelse return true;
+        return spec.family == .leafref or spec.family == .@"instance-identifier" or spec.family == .@"union";
+    }
+
+    fn prepareChildren(self: *DocumentValidator, children: []const *Statement) Error!bool {
+        var any = false;
         for (children) |s| {
             _ = try self.ifFeaturesActive(s);
             _ = try self.keys.key(s);
             if (s.kind() == .list) _ = try self.preparedKeyNames(s);
-            if (leafType(s)) |t| try self.checker.prepareRestrictions(t);
-            if (s.kind() == .choice) {
-                try self.prepareChildren(s.data.choice.cases.items);
-            } else {
+            var needs = s.when != null or s.must_statements.items.len != 0;
+            if (leafType(s)) |t| {
+                try self.checker.prepareRestrictions(t);
+                needs = needs or typeNeedsXPath(t);
+            }
+            try self.prepared.child_index.prepare(self.a, s);
+            const descendants = if (s.kind() == .choice)
+                try self.prepareChildren(s.data.choice.cases.items)
+            else blk: {
                 const saved = self.keys.parent_module;
                 if (s.kind() != .case) self.keys.parent_module = rfc7951.definingModuleName(s, saved);
                 defer self.keys.parent_module = saved;
-                try self.prepareChildren(s.statements.items);
-            }
+                break :blk try self.prepareChildren(s.statements.items);
+            };
+            needs = needs or descendants;
+            try self.prepared.needs_xpath_ctx.put(self.a, s, needs);
+            any = any or needs;
         }
+        return any;
     }
 
     /// `validate`: walk the canonical tree from the module root.
@@ -213,11 +243,13 @@ pub const DocumentValidator = struct {
     }
 
     fn validateFrom(self: *DocumentValidator, data: Val, root: Owner) Error![]ValidationError {
+        self.xpath_steps = 0;
         self.errors = .empty;
         self.case_stack = .empty;
         self.case_data_stack = .empty;
         defer self.clearPrepared();
-        try self.prepareChildren(root.statements());
+        _ = try self.prepareChildren(root.statements());
+        self.checker.schema_index = &self.prepared.child_index;
         var path: PathBuilder = .{ .a = self.a };
         defer path.frames.deinit(self.a);
         const schema: xpath.node.Schema = switch (root) {
@@ -338,7 +370,8 @@ pub const DocumentValidator = struct {
         self.case_stack = .empty;
         self.case_data_stack = .empty;
         self.root = root;
-        try self.prepareChildren(run.operation.statements.items);
+        _ = try self.prepareChildren(run.operation.statements.items);
+        self.checker.schema_index = &self.prepared.child_index;
         const op_node = try holder_node.step(self.a, .{ .object = canonical }, .{ .stmt = run.operation });
         var path: PathBuilder = .{ .a = self.a };
         defer path.frames.deinit(self.a);
@@ -592,9 +625,11 @@ pub const DocumentValidator = struct {
         }
 
         const val = try self.effectiveValue(found, s);
-        const curr = try parent.step(self.a, val orelse .null, .{ .stmt = s });
+        const needs_xpath = self.prepared.needs_xpath_ctx.get(s) orelse true;
+        const curr = if (needs_xpath) try self.stepNode(parent, val orelse .null, s) else parent;
 
         if (s.hasWhen()) if (s.when) |w| {
+            std.debug.assert(needs_xpath);
             // RFC 7950 7.21.5: a `when` merged from `uses` or `augment` uses the parent.
             const ok = try self.evalExpr(w.ast, if (w.evaluate_with_parent_context) parent else curr) orelse true;
             if (!ok) {
@@ -635,7 +670,7 @@ pub const DocumentValidator = struct {
                 defer path.pop();
                 const empty = try self.a.create(Object);
                 empty.* = .empty;
-                const empty_node = try parent.step(self.a, .{ .object = empty }, .{ .stmt = s });
+                const empty_node = if (needs_xpath) try self.stepNode(parent, .{ .object = empty }, s) else parent;
                 const saved = self.enter(s);
                 defer self.keys.parent_module = saved;
                 try self.visitChildren(.{ .object = empty }, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), empty_node);
@@ -644,11 +679,14 @@ pub const DocumentValidator = struct {
         }
 
         if (s.hasMust() and s.kind() != .list) {
+            std.debug.assert(needs_xpath or s.must_statements.items.len == 0);
             if (s.kind() == .leaf_list) {
                 // Per element; a non-array value was already rejected above.
                 const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
                 for (items, 0..) |item, i| {
-                    const item_node = try parent.step(self.a, item, .{ .stmt = s });
+                    if (s.must_statements.items.len == 0) continue;
+                    std.debug.assert(needs_xpath);
+                    const item_node = try self.stepNode(parent, item, s);
                     try self.checkMust(s, item_node, .{ .path = path, .child = json_name, .index = i });
                 }
             } else {
@@ -657,14 +695,18 @@ pub const DocumentValidator = struct {
         }
 
         if (s.kind() == .leaf) if (leafType(s)) |t| if (val) |v| if (v != .null) {
-            for (try self.checker.checkIn(v, t, self.context(curr))) |i| try self.add(try loc.display(), try loc.pointer(), i.code, i.message);
+            const issues = if (needs_xpath) try self.checker.checkIn(v, t, self.context(curr)) else try self.checker.checkWithoutXPath(v, t);
+            for (issues) |i| try self.add(try loc.display(), try loc.pointer(), i.code, i.message);
         };
         if (s.kind() == .leaf_list) if (leafType(s)) |t| {
             const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
             for (items, 0..) |item, i| {
                 const item_loc: Location = .{ .path = path, .child = json_name, .index = i };
-                const item_node = try parent.step(self.a, item, .{ .stmt = s });
-                for (try self.checker.checkIn(item, t, self.context(item_node))) |iss| try self.add(try item_loc.display(), try item_loc.pointer(), iss.code, iss.message);
+                const issues = if (needs_xpath) blk: {
+                    const item_node = try self.stepNode(parent, item, s);
+                    break :blk try self.checker.checkIn(item, t, self.context(item_node));
+                } else try self.checker.checkWithoutXPath(item, t);
+                for (issues) |iss| try self.add(try item_loc.display(), try item_loc.pointer(), iss.code, iss.message);
             }
         };
 
@@ -686,7 +728,8 @@ pub const DocumentValidator = struct {
                 for (key_names) |k| {
                     if (!entry.object.contains(k)) try self.add(try self.a.print("{s}/{s}", .{ try path.current(), k }), try self.a.print("{s}/{s}", .{ try path.pointer(), k }), "mandatory", try self.a.print("Missing list key '{s}'", .{k}));
                 }
-                const entry_node = try xpath.node.newNode(self.a, entry, .{ .stmt = s }, parent);
+                const entry_node = if (needs_xpath) try self.stepNode(parent, entry, s) else parent;
+                std.debug.assert(needs_xpath or s.must_statements.items.len == 0);
                 try self.checkMust(s, entry_node, .{ .path = path });
                 const saved = self.enter(s);
                 defer self.keys.parent_module = saved;
@@ -995,4 +1038,70 @@ test "choice members and unknown fields remain distinct" {
     try std.testing.expectEqual(@as(usize, 1), result.errors.len);
     try std.testing.expectEqualStrings("unknown-field", result.errors[0].code);
     try std.testing.expectEqualStrings("/m:top/extra", result.errors[0].pointer);
+}
+
+test "XPath-free subtree creates no stepped document nodes" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module m { namespace 'urn:m'; prefix m; container top {
+        \\ list items { key 'id'; leaf id { type string; }
+        \\ leaf-list tags { type string; } } } }
+    , "test.yang", &diag);
+    var msg: []const u8 = "";
+    const data = try jv.parse(a, "{\"top\":{\"items\":[{\"id\":\"a\",\"tags\":[\"x\",\"y\"]}]}}", &msg);
+    var checker: type_checker.TypeChecker = .{ .a = a, .root = module };
+    defer checker.deinit();
+    var keys: rfc7951.MemberKeys = .{ .a = a, .parent_module = module.name };
+    var validator: DocumentValidator = .{ .a = a, .module = module, .checker = &checker, .keys = &keys, .enabled = try if_feature_eval.buildEnabledFeatures(a, module, null) };
+    try std.testing.expectEqual(@as(usize, 0), (try validator.validate(data)).len);
+    try std.testing.expectEqual(@as(usize, 0), validator.xpath_steps);
+}
+
+test "when must and relative leafref retain their contexts" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module m { namespace 'urn:m'; prefix m; container top {
+        \\ leaf enabled { type boolean; }
+        \\ list items { key 'id'; leaf id { type string; }
+        \\ leaf ref { when '../../enabled = "true"';
+        \\ must '. = ../id'; type leafref { path '../id'; } } } } }
+    , "test.yang", &diag);
+    var msg: []const u8 = "";
+    const data = try jv.parse(a, "{\"m:top\":{\"enabled\":true,\"items\":[{\"id\":\"a\",\"ref\":\"a\"},{\"id\":\"b\",\"ref\":\"a\"}]}}", &msg);
+    var validator = @import("yang_validator.zig").YangValidator.init(a, module);
+    const result = try validator.validate(data, .{});
+    var must = false;
+    var leafref = false;
+    for (result.errors) |err| {
+        if (std.mem.eql(u8, err.code, "must")) must = true;
+        if (std.mem.eql(u8, err.code, "leafref")) leafref = true;
+        try std.testing.expect(!std.mem.eql(u8, err.code, "when"));
+    }
+    try std.testing.expect(must and leafref);
+}
+
+test "typedef leafref retains its relative context" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module m { namespace 'urn:m'; prefix m;
+        \\ typedef ref-type { type leafref { path '../id'; } }
+        \\ list items { key 'id'; leaf id { type string; }
+        \\ leaf ref { type ref-type; } } }
+    , "test.yang", &diag);
+    var msg: []const u8 = "";
+    const data = try jv.parse(a, "{\"m:items\":[{\"id\":\"a\",\"ref\":\"a\"},{\"id\":\"b\",\"ref\":\"a\"}]}", &msg);
+    var validator = @import("yang_validator.zig").YangValidator.init(a, module);
+    const result = try validator.validate(data, .{});
+    try std.testing.expectEqual(@as(usize, 1), result.errors.len);
+    try std.testing.expectEqualStrings("leafref", result.errors[0].code);
+    try std.testing.expectEqualStrings("/m:items/1/ref", result.errors[0].pointer);
 }
