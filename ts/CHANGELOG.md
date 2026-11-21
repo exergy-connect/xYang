@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.8] — 2026-11-21
+
 ### Added
 
 - `{ canonical: true }` (CLI `--canonical`, with `nativeJson: true`) validates a native instance that is already in canonical form as written, without building a projected copy. A false claim is reported as `canonical` errors at the input pointer only. A synthetic 1000-node Netlab ring validates in about 16 ms instead of 30 ms, with about 17 MiB instead of 29 MiB extra peak memory (#262).
@@ -334,7 +336,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.8...HEAD
+[1.0.8]: https://github.com/exergy-connect/xYang/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/exergy-connect/xYang/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/exergy-connect/xYang/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/exergy-connect/xYang/compare/v1.0.4...v1.0.5

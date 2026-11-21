@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.8] — 2026-11-21
+
 ### Added
 
 - `canonical=True` (TypeScript `{ canonical: true }`, CLI `--canonical` in Python, TypeScript and Zig) validates a native instance that is already in canonical form as written, without building a projected copy. The claim is checked strictly: a dotted key, a list given as an object, a member spelled differently from the projection, or a value an `xt:normalize` rule would change is a `canonical` error at the input pointer, and nothing else is reported. On a synthetic 1000-node Netlab ring, TypeScript validates in about 16 ms instead of 30 ms and Python in about 147 ms instead of 167 ms; the extra peak memory during validation drops from about 29 MiB to 17 MiB (TypeScript) and from 5.7 MiB to 0.1 MiB (Python) (#262).
@@ -549,7 +551,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
 - ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.8...HEAD
+[1.0.8]: https://github.com/exergy-connect/xYang/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/exergy-connect/xYang/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/exergy-connect/xYang/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/exergy-connect/xYang/compare/v1.0.4...v1.0.5
