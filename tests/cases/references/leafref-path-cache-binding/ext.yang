@@ -1,0 +1,17 @@
+module ext {
+  yang-version 1.1;
+  namespace "urn:ext";
+  prefix p;
+
+  import base { prefix b; }
+
+  augment "/b:top" {
+    list item {
+      key n;
+      leaf n { type string; }
+    }
+    leaf eref {
+      type leafref { path "/top/p:item/p:n"; }
+    }
+  }
+}

@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reduce repeated member-name and path work during Python document validation (#263).
+- TypeScript validation caches absolute leafref, `must` and `when` paths without context-dependent predicates once per validation, as Python does, and keeps each leafref's target value set with the cached node-set. A synthetic 1000-node Netlab ring validates in about 38 ms instead of about 370 ms (#260).
+- Python leafref checks keep the target value set with the cached node-set instead of rebuilding a list for every leafref (#265).
+
+### Fixed
+
+- Leafref membership is exact in both languages: TypeScript no longer accepts the string `"1"` for a number target `1`, and Python no longer accepts `true` for `1` (#265).
 
 ## [1.0.7] — 2026-11-20
 

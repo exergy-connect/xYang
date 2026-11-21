@@ -1,7 +1,7 @@
 import { XPathEvaluationError } from "../core/errors";
 import { YangModule } from "../core/model";
 import { isDerivedFromOrSelfQNames, isDerivedFromStrictQNames } from "../identity-graph";
-import { XPathAstNode, XPathBinaryNode, XPathPathNode, XPathPathSegment, isWildcardStep, stepPrefix } from "./ast";
+import { XPathAstNode, XPathBinaryNode, XPathPathNode, XPathPathSegment, isWildcardStep, pathCacheKey, stepPrefix } from "./ast";
 import { unknownFunctionError } from "./functions";
 
 export type XPathSchema = {
@@ -18,10 +18,35 @@ export type XPathNode = {
   parent: XPathNode | null;
 };
 
+/** One cached node-set, and the leafref value set derived from it on first use. */
+export type XPathPathCacheEntry = {
+  nodes: XPathNode[];
+  values?: ReadonlySet<unknown>;
+};
+
+/** Per-validation cache of absolute cacheable paths, keyed by `pathCacheKey`; one per root node. */
+export type XPathPathCache = Map<string, XPathPathCacheEntry>;
+
 export type XPathContext = {
   current: XPathNode;
   root: XPathNode;
+  /** Shared by every expression of one validation run; omitted disables caching. */
+  pathCache?: XPathPathCache;
 };
+
+export type XPathCacheStats = { lookups: number; hits: number; hitRatio: number };
+
+/** Scalar target values, for exact leafref membership: the string "1" is not the number 1. */
+function targetValues(nodes: XPathNode[]): Set<unknown> {
+  const values = new Set<unknown>();
+  for (const node of nodes) {
+    const v = node.data;
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      values.add(v);
+    }
+  }
+  return values;
+}
 
 function isNode(value: unknown): value is XPathNode {
   return Boolean(value) && typeof value === "object" && "schema" in (value as Record<string, unknown>) && "parent" in (value as Record<string, unknown>);
@@ -389,7 +414,61 @@ export class XPathEvaluator {
     }
   }
 
+  private cacheLookups = 0;
+
+  private cacheHits = 0;
+
+  /** Reset cache stats. Call at the start of each validation run. */
+  clearCacheStats(): void {
+    this.cacheLookups = 0;
+    this.cacheHits = 0;
+  }
+
+  getCacheStats(): XPathCacheStats {
+    return {
+      lookups: this.cacheLookups,
+      hits: this.cacheHits,
+      hitRatio: this.cacheLookups ? this.cacheHits / this.cacheLookups : 0
+    };
+  }
+
+  /**
+   * Resolve a path expression to a node-set. Only absolute cacheable paths (`path.isCacheable`)
+   * use `context.pathCache`; every other path is evaluated from `node` each time.
+   */
   evalPath(path: XPathPathNode, context: XPathContext, node: XPathNode): XPathNode[] {
+    const entry = this.cacheEntry(path, context, node);
+    return entry ? entry.nodes : this.evalPathUncached(path, context, node);
+  }
+
+  /** Leafref target values of `path`; a cached path builds its set once per validation run. */
+  evalPathValues(path: XPathPathNode, context: XPathContext, node: XPathNode): ReadonlySet<unknown> {
+    const entry = this.cacheEntry(path, context, node);
+    if (!entry) {
+      return targetValues(this.evalPathUncached(path, context, node));
+    }
+    entry.values ??= targetValues(entry.nodes);
+    return entry.values;
+  }
+
+  private cacheEntry(path: XPathPathNode, context: XPathContext, node: XPathNode): XPathPathCacheEntry | undefined {
+    const cache = context.pathCache;
+    if (!cache || path.isCacheable !== true) {
+      return undefined;
+    }
+    this.cacheLookups += 1;
+    const key = pathCacheKey(path);
+    let entry = cache.get(key);
+    if (entry) {
+      this.cacheHits += 1;
+      return entry;
+    }
+    entry = { nodes: this.evalPathUncached(path, context, node) };
+    cache.set(key, entry);
+    return entry;
+  }
+
+  private evalPathUncached(path: XPathPathNode, context: XPathContext, node: XPathNode): XPathNode[] {
     let nodes: XPathNode[] = [path.isAbsolute ? context.root : node];
 
     for (const segment of path.segments) {

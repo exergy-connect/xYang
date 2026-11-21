@@ -239,3 +239,81 @@ def test_local_expression_cache_hit(xpath_caching_module):
     assert stats["lookups"] == 2
     assert stats["hits"] == 1
     print(f"\n  Cache stats: {stats}")
+
+
+@pytest.mark.parametrize(
+    ("expression", "cacheable"),
+    [
+        ("/top/flag", True),
+        ("../flag", False),
+        ("/top/items[1]/id", True),
+        ("/top/items[1 + 1]/id", True),
+        ("/top/items[/top/flag]/id", True),
+        ("/top/items[1.0]/id", False),
+        ("/top/items[- 1]/id", False),
+        ("/top/items[id = 1]/id", False),
+        ("/top/items[current() = 1]/id", False),
+        ("/top/xc:*", False),
+    ],
+)
+def test_path_cacheability(expression, cacheable):
+    """Same table as the TypeScript parser test (#260): only context-free absolute paths are cacheable."""
+    assert XPathParser(expression).parse().is_cacheable is cacheable
+
+
+LEAFREF_CACHE_YANG = """
+module lc {
+  yang-version 1.1;
+  namespace "urn:lc";
+  prefix lc;
+
+  list nodes {
+    key name;
+    leaf name { type string; }
+  }
+  list links {
+    key id;
+    leaf id { type string; }
+    leaf-list ends { type leafref { path "/nodes/name"; } }
+  }
+  list groups {
+    key name;
+    leaf name { type string; }
+    list member {
+      key name;
+      leaf name { type string; }
+    }
+    leaf pick { type leafref { path "../member/name"; } }
+    leaf pick-current { type leafref { path "/groups[name = current()/../name]/member/name"; } }
+  }
+}
+"""
+
+
+@pytest.fixture(scope="module")
+def leafref_cache_module():
+    return parse_yang_string(LEAFREF_CACHE_YANG)
+
+
+def _leafref_stats(module, data):
+    doc_validator = YangValidator(module)._document_validator(module)
+    errors = doc_validator.validate(data)
+    stats = doc_validator._evaluator.get_cache_stats()
+    return {"valid": not errors, "lookups": stats["lookups"], "hits": stats["hits"]}
+
+
+def test_leafref_absolute_path_cached(leafref_cache_module):
+    """#265: one evaluation of /nodes/name serves every leafref; its value set is cached with it."""
+    links = [{"id": str(i), "ends": ["a", "b"]} for i in range(5)]
+    data = {"nodes": [{"name": "a"}, {"name": "b"}], "links": links}
+    assert _leafref_stats(leafref_cache_module, data) == {"valid": True, "lookups": 10, "hits": 9}
+
+
+@pytest.mark.parametrize("leaf", ["pick", "pick-current"])
+def test_leafref_context_path_not_cached(leafref_cache_module, leaf):
+    """#265: a relative path or current() predicate is evaluated from each leaf, never cached."""
+    groups = [
+        {"name": "g1", "member": [{"name": "x"}], leaf: "x"},
+        {"name": "g2", "member": [{"name": "y"}], leaf: "y"},
+    ]
+    assert _leafref_stats(leafref_cache_module, {"groups": groups}) == {"valid": True, "lookups": 0, "hits": 0}

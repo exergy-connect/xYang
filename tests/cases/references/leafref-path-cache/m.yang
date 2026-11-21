@@ -1,0 +1,53 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  list nodes {
+    key name;
+    leaf name { type string; }
+  }
+
+  list links {
+    key id;
+    leaf id { type string; }
+    leaf-list ends {
+      type leafref { path "/nodes/name"; }
+    }
+  }
+
+  list groups {
+    key name;
+    leaf name { type string; }
+    list member {
+      key name;
+      leaf name { type string; }
+    }
+    leaf pick {
+      type leafref { path "../member/name"; }
+    }
+    leaf pick-current {
+      type leafref { path "/groups[name = current()/../name]/member/name"; }
+    }
+  }
+
+  container top {
+    list slot {
+      key id;
+      leaf id { type string; }
+    }
+    leaf first {
+      type leafref { path "/top/slot[1]/id"; }
+    }
+    leaf second {
+      type leafref { path "/top/slot[2]/id"; }
+    }
+    list num {
+      key v;
+      leaf v { type uint8; }
+    }
+    leaf num-ref {
+      type leafref { path "/top/num/v"; }
+    }
+  }
+}

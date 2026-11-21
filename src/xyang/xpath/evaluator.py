@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import math
 from typing import Any, Optional
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 
 from .ast import (
     ASTNode,
@@ -102,6 +102,20 @@ _BINARY_OP_HANDLERS: dict[str, Callable[[Any, Any], Any]] = {
 }
 
 
+def leafref_member(value: Any) -> Any:
+    """Membership key of a leafref value: JSON ``true`` is not the number 1 (``True == 1`` in Python)."""
+    return (bool, value) if isinstance(value, bool) else value
+
+
+def _value_set(nodes: list[Node]) -> Collection[Any]:
+    """``frozenset`` of the nodes' membership keys; a list when some value (container, list) is unhashable."""
+    values = [leafref_member(n.data) for n in nodes]
+    try:
+        return frozenset(values)
+    except TypeError:
+        return values
+
+
 class XPathEvaluator:
     """
     Stateless YANG XPath evaluator.
@@ -189,6 +203,23 @@ class XPathEvaluator:
                 logger.debug("path_cache store key=%r nodes=%r", key, [n.data for n in nodes])
 
         return nodes
+
+    def eval_path_values(self, path: PathNode, ctx: Context, node: Node) -> Collection[Any]:
+        """Membership keys (``leafref_member``) of the nodes *path* selects, for leafref checks.
+
+        An absolute cacheable path stores its value set next to its node-set in
+        ctx.path_cache, so it is built once per run. Any other path is evaluated
+        from *node* every time.
+        """
+        nodes = self.eval_path(path, ctx, node)
+        path_cache = ctx.path_cache
+        if path_cache is None or not path.is_cacheable:
+            return _value_set(nodes)
+        key = (_path_cache_key(path), "values")
+        values = path_cache.get(key)
+        if values is None:
+            values = path_cache[key] = _value_set(nodes)
+        return values
 
     def _eval_path_inner(
         self, path: PathNode, ctx: Context, node: Node

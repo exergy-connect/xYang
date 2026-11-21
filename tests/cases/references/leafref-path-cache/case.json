@@ -1,0 +1,58 @@
+{
+  "description": "Issues #260, #265: an absolute leafref path without context-dependent predicates is evaluated once per validation and its target values are kept with the cached node-set. Every other path is evaluated from its own context node: a relative path or a current() predicate must not reuse the targets of an earlier list entry, and paths that differ only by a predicate must not share targets. A dangling value is still a leafref error, and membership does not convert between JSON types.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "many valid references",
+      "data": {
+        "nodes": [{ "name": "a" }, { "name": "b" }, { "name": "c" }],
+        "links": [{ "id": "1", "ends": ["a", "b"] }, { "id": "2", "ends": ["b", "c"] }, { "id": "3", "ends": ["c", "a"] }],
+        "groups": [
+          { "name": "g1", "member": [{ "name": "x" }], "pick": "x", "pick-current": "x" },
+          { "name": "g2", "member": [{ "name": "y" }], "pick": "y", "pick-current": "y" }
+        ],
+        "top": { "slot": [{ "id": "p" }, { "id": "q" }], "first": "p", "second": "q", "num": [{ "v": 1 }, { "v": 2 }], "num-ref": 2 }
+      },
+      "valid": true },
+    { "name": "one dangling absolute reference among many",
+      "data": {
+        "nodes": [{ "name": "a" }, { "name": "b" }, { "name": "c" }],
+        "links": [{ "id": "1", "ends": ["a", "b"] }, { "id": "2", "ends": ["b", "c"] }, { "id": "3", "ends": ["c", "zz"] }]
+      },
+      "valid": false,
+      "errors": [{ "path": "/links/2/ends/1", "code": "leafref" }] },
+    { "name": "relative path valid for the first entry, dangling for the second",
+      "data": {
+        "groups": [
+          { "name": "g1", "member": [{ "name": "x" }], "pick": "x" },
+          { "name": "g2", "member": [{ "name": "y" }], "pick": "x" }
+        ]
+      },
+      "valid": false,
+      "errors": [{ "path": "/groups/1/pick", "code": "leafref" }] },
+    { "name": "current() predicate valid for the first entry, dangling for the second",
+      "data": {
+        "groups": [
+          { "name": "g1", "member": [{ "name": "x" }], "pick-current": "x" },
+          { "name": "g2", "member": [{ "name": "y" }], "pick-current": "x" }
+        ]
+      },
+      "valid": false,
+      "errors": [{ "path": "/groups/1/pick-current", "code": "leafref" }] },
+    { "name": "paths that differ only by a positional predicate",
+      "data": { "top": { "slot": [{ "id": "p" }, { "id": "q" }], "first": "p", "second": "p" } },
+      "valid": false,
+      "errors": [{ "path": "/top/second", "code": "leafref" }] },
+    { "name": "dangling number",
+      "data": { "top": { "num": [{ "v": 1 }], "num-ref": 3 } },
+      "valid": false,
+      "errors": [{ "path": "/top/num-ref", "code": "leafref" }] },
+    { "name": "string naming a number target",
+      "data": { "top": { "num": [{ "v": 1 }], "num-ref": "1" } },
+      "valid": false,
+      "errors": [{ "path": "/top/num-ref", "code": "leafref" }] },
+    { "name": "boolean naming a number target",
+      "data": { "top": { "num": [{ "v": 1 }], "num-ref": true } },
+      "valid": false,
+      "errors": [{ "path": "/top/num-ref", "code": "leafref" }] }
+  ]
+}
