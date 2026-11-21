@@ -15,6 +15,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Changed
 
+- Reuse `if-feature` evaluation for repeated schema nodes during validation (#263).
 - Validation uses cached schema dispatch plans to visit present members and absent nodes that require checks (#261).
 
 - Reuse member names and skip empty feature checks during document validation (#263).
