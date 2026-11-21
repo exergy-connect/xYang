@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Speed up Python YANG tokenization for identifiers and ASCII digits (#264).
 - Validation uses cached schema dispatch plans to visit present members and absent nodes that require checks (#261).
 
 - Reduce repeated member-name and path work during Python document validation (#263).
