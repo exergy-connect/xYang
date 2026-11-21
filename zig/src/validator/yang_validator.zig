@@ -8,6 +8,8 @@
 //! (`operation.zig`); a call that makes no sense returns `error.Usage`.
 
 const std = @import("std");
+const builtin = @import("builtin");
+const utf8 = @import("../utf8.zig");
 const ast = @import("../ast.zig");
 const jv = @import("../json_value.zig");
 const module_mod = @import("../module.zig");
@@ -46,6 +48,9 @@ pub const Options = struct {
     /// With `native_json`: the data claims to be canonical. It is checked and validated as
     /// written, without a projection; a failed check returns only its errors.
     canonical: bool = false,
+    /// Caller promises that all instance strings and schema defaults checked as strings
+    /// contain only ASCII. Debug builds assert the promise; a false promise is invalid.
+    assume_ascii: bool = false,
 };
 
 pub const Result = struct {
@@ -70,6 +75,10 @@ pub const YangValidator = struct {
     }
 
     pub fn validate(self: *YangValidator, data: Val, options: Options) Error!Result {
+        if (builtin.mode == .debug and options.assume_ascii) {
+            assertAsciiValues(data);
+            if (options.context) |context| assertAsciiValues(context);
+        }
         var u: operation.Usage = .{ .a = self.a };
         const all = self.collect(&u, data, options) catch |err| {
             if (err == error.Usage) self.usage = u.message;
@@ -86,7 +95,8 @@ pub const YangValidator = struct {
         if (options.canonical and !options.native_json) return u.fail("canonical applies only to native JSON (native_json=True)", .{});
         if (options.canonical and (options.rpc != null or options.action != null)) return u.fail("canonical does not apply to rpc or action instances", .{});
         if (options.rpc != null or options.action != null) return self.collectOperation(u, data, options);
-        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = self.module };
+        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = self.module, .assume_ascii = options.assume_ascii };
+        defer checker.regex_scratch.deinit(self.a);
         var structure: ?*Statement = null;
         var structure_key: []const u8 = "";
         var instance_data = data;
@@ -205,7 +215,8 @@ pub const YangValidator = struct {
             }
         }
         const accessible = try operation.accessibleModule(self.a, self.module, target, op_node);
-        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = accessible.module };
+        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = accessible.module, .assume_ascii = options.assume_ascii };
+        defer checker.regex_scratch.deinit(self.a);
         var keys: rfc7951.MemberKeys = .{ .a = self.a, .parent_module = self.module.name };
         var dv: document_validator.DocumentValidator = .{
             .a = self.a,
@@ -256,6 +267,17 @@ pub const YangValidator = struct {
     }
 };
 
+fn assertAsciiValues(value: Val) void {
+    switch (value) {
+        .string => |s| {
+            _ = utf8.AsciiSlice.initTrusted(s);
+        },
+        .array => |items| for (items) |item| assertAsciiValues(item),
+        .object => |obj| for (obj.values()) |item| assertAsciiValues(item),
+        else => {},
+    }
+}
+
 /// `_prefix_member`: a path or JSON Pointer under the member as written.
 fn prefixMember(a: Allocator, json_key: []const u8, location: []const u8) error{OutOfMemory}![]const u8 {
     const token = try instance.pointerToken(a, json_key);
@@ -299,4 +321,22 @@ pub fn featureMap(a: Allocator, value: Val, message: *[]const u8) error{ OutOfMe
         try out.put(a, name, set);
     }
     return out;
+}
+
+test "ASCII proclamation preserves validation results" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a, "module m { namespace 'urn:m'; prefix m; leaf x { type string { length '2..4'; pattern '[a-z]+'; } } }", "test.yang", &diag);
+    var message: []const u8 = "";
+    const data = try jv.parse(a, "{\"m:x\":\"abc\"}", &message);
+    var validator = YangValidator.init(a, module);
+    try std.testing.expect((try validator.validate(data, .{})).valid());
+    try std.testing.expect((try validator.validate(data, .{ .assume_ascii = true })).valid());
+    const invalid = try jv.parse(a, "{\"m:x\":\"A\"}", &message);
+    const normal = try validator.validate(invalid, .{});
+    const claimed = try validator.validate(invalid, .{ .assume_ascii = true });
+    try std.testing.expectEqual(normal.errors.len, claimed.errors.len);
+    try std.testing.expectEqual(@as(usize, 2), claimed.errors.len);
 }

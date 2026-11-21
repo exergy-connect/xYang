@@ -89,4 +89,15 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(lib_tests).step);
     test_step.dependOn(&b.addRunArtifact(exe_tests).step);
+    // Assertions are deliberately exercised in a separate Debug executable.
+    const assert_lib = b.createModule(.{ .root_source_file = b.path("src/root.zig"), .target = target, .optimize = .debug });
+    const assert_test = b.addExecutable(.{ .name = "ascii-assert-test", .root_module = b.createModule(.{
+        .root_source_file = b.path("src/ascii_assert_test.zig"),
+        .target = target,
+        .optimize = .debug,
+        .imports = &.{.{ .name = "xyang", .module = assert_lib }},
+    }) });
+    const run_assert_test = b.addRunArtifact(assert_test);
+    run_assert_test.expectExitCode(42);
+    test_step.dependOn(&run_assert_test.step);
 }

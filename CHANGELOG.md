@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Zig reuses regex working buffers and streams UTF-8 input, with a bitset for ASCII character classes. Zig callers can proclaim ASCII instance strings and schema defaults with `Options.assume_ascii`, checked in Debug builds (#276).
+
 - Zig counts decimal64 fraction digits from the parsed coefficient, takes a constant-time decoded length for unpadded 64-byte-aligned base64, and parses YANG source that is already valid UTF-8 and LF-only without a second scan. Built-in leaves no longer allocate a typedef-units map (#275).
 
 ## [1.0.8] — 2026-11-21
