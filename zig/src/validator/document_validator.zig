@@ -11,6 +11,7 @@
 //! the parent, a list's `must` per entry, a leaf-list's `must` per item.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const ast = @import("../ast.zig");
 const jv = @import("../json_value.zig");
 const module_mod = @import("../module.zig");
@@ -91,6 +92,25 @@ fn leafType(s: *const Statement) ?*TypeStmt {
     };
 }
 
+pub const PreparedSchema = struct {
+    active_stmts: std.AutoHashMapUnmanaged(*const Statement, bool) = .empty,
+    list_keys: std.AutoHashMapUnmanaged(*const Statement, []const []const u8) = .empty,
+};
+
+const Location = struct {
+    path: *const PathBuilder,
+    child: ?[]const u8 = null,
+    index: ?usize = null,
+    fn display(self: Location) error{OutOfMemory}![]const u8 {
+        const base = if (self.child) |name| try self.path.child(name) else try self.path.current();
+        return if (self.index) |i| self.path.a.print("{s}[{d}]", .{ base, i }) else base;
+    }
+    fn pointer(self: Location) error{OutOfMemory}![]const u8 {
+        const base = if (self.child) |name| try self.path.childPointer(name) else try self.path.pointer();
+        return if (self.index) |i| self.path.a.print("{s}/{d}", .{ base, i }) else base;
+    }
+};
+
 pub const DocumentValidator = struct {
     a: Allocator,
     module: *Module,
@@ -98,6 +118,7 @@ pub const DocumentValidator = struct {
     checker: *type_checker.TypeChecker,
     keys: *rfc7951.MemberKeys,
     errors: std.ArrayList(ValidationError) = .empty,
+    prepared: PreparedSchema = .{},
     /// The XPath root: the canonical data under the module.
     root: *const XNode = undefined,
     case_stack: std.ArrayList(*Statement) = .empty,
@@ -133,16 +154,16 @@ pub const DocumentValidator = struct {
     }
 
     /// `_check_must`: each `must` of `s` at `node`.
-    fn checkMust(self: *DocumentValidator, s: *const Statement, node: *const XNode, path: []const u8, pointer: []const u8) error{OutOfMemory}!void {
+    fn checkMust(self: *DocumentValidator, s: *const Statement, node: *const XNode, loc: Location) error{OutOfMemory}!void {
         for (s.must_statements.items) |must| {
             const result = try self.evalExpr(must.ast, node) orelse {
-                try self.addExpr(path, pointer, "xpath-error", try self.a.print("Error evaluating must expression on '{s}'", .{s.name}), must.expression);
+                try self.addExpr(try loc.display(), try loc.pointer(), "xpath-error", try self.a.print("Error evaluating must expression on '{s}'", .{s.name}), must.expression);
                 continue;
             };
             if (!result) {
                 const base = if (must.error_message.len > 0) must.error_message else try self.a.print("must constraint not satisfied on '{s}'", .{s.name});
                 const message = if (must.error_app_tag.len > 0) try self.a.print("{s} (error-app-tag: {s})", .{ base, must.error_app_tag }) else base;
-                try self.addExpr(path, pointer, "must", message, must.expression);
+                try self.addExpr(try loc.display(), try loc.pointer(), "must", message, must.expression);
             }
         }
     }
@@ -150,7 +171,35 @@ pub const DocumentValidator = struct {
     fn ifFeaturesActive(self: *DocumentValidator, s: *const Statement) error{OutOfMemory}!bool {
         if (!self.module_root) return true;
         if (!s.hasIfFeatures() or s.if_features.items.len == 0) return true;
-        return if_feature_eval.ifFeaturesSatisfied(self.a, s.if_features.items, self.module, &self.enabled, s.included_from);
+        if (self.prepared.active_stmts.get(s)) |active| return active;
+        const active = try if_feature_eval.ifFeaturesSatisfied(self.a, s.if_features.items, self.module, &self.enabled, s.included_from);
+        try self.prepared.active_stmts.put(self.a, s, active);
+        return active;
+    }
+
+    fn clearPrepared(self: *DocumentValidator) void {
+        var it = self.prepared.list_keys.valueIterator();
+        while (it.next()) |keys| self.a.free(keys.*);
+        self.prepared.list_keys.deinit(self.a);
+        self.prepared.active_stmts.deinit(self.a);
+        self.prepared = .{};
+    }
+
+    fn prepareChildren(self: *DocumentValidator, children: []const *Statement) Error!void {
+        for (children) |s| {
+            _ = try self.ifFeaturesActive(s);
+            _ = try self.keys.key(s);
+            if (s.kind() == .list) _ = try self.preparedKeyNames(s);
+            if (leafType(s)) |t| try self.checker.prepareRestrictions(t);
+            if (s.kind() == .choice) {
+                try self.prepareChildren(s.data.choice.cases.items);
+            } else {
+                const saved = self.keys.parent_module;
+                if (s.kind() != .case) self.keys.parent_module = rfc7951.definingModuleName(s, saved);
+                defer self.keys.parent_module = saved;
+                try self.prepareChildren(s.statements.items);
+            }
+        }
     }
 
     /// `validate`: walk the canonical tree from the module root.
@@ -167,7 +216,10 @@ pub const DocumentValidator = struct {
         self.errors = .empty;
         self.case_stack = .empty;
         self.case_data_stack = .empty;
+        defer self.clearPrepared();
+        try self.prepareChildren(root.statements());
         var path: PathBuilder = .{ .a = self.a };
+        defer path.frames.deinit(self.a);
         const schema: xpath.node.Schema = switch (root) {
             .module => |m| .{ .module = m },
             .stmt => |st| .{ .stmt = st },
@@ -192,6 +244,7 @@ pub const DocumentValidator = struct {
     /// `validate_operation`: the parameters of one rpc or action `input` or `output`
     /// (RFC 7950 7.14, 7.15), without the RFC 8040 wrapper. Pointers address `params`.
     pub fn validateOperation(self: *DocumentValidator, u: *operation_mod.Usage, params: Val, run: OperationRun) (Error || error{Usage})![]ValidationError {
+        defer self.clearPrepared();
         const target = run.target;
         for (target.parents) |step| {
             for (step.wrappers) |w| if (!try self.ifFeaturesActive(w)) {
@@ -285,9 +338,11 @@ pub const DocumentValidator = struct {
         self.case_stack = .empty;
         self.case_data_stack = .empty;
         self.root = root;
+        try self.prepareChildren(run.operation.statements.items);
         const op_node = try holder_node.step(self.a, .{ .object = canonical }, .{ .stmt = run.operation });
-        try self.checkMust(run.operation, op_node, "/", "");
         var path: PathBuilder = .{ .a = self.a };
+        defer path.frames.deinit(self.a);
+        try self.checkMust(run.operation, op_node, .{ .path = &path });
         try self.visitChildren(.{ .object = canonical }, .{ .stmt = run.operation }, &path, true, op_node);
         for (self.errors.items) |e| {
             var err = e;
@@ -322,8 +377,7 @@ pub const DocumentValidator = struct {
 
     // -- effective values and defaults --------------------------------------------------
 
-    fn effectiveValue(self: *DocumentValidator, data: *const Object, s: *const Statement) Error!?Val {
-        const found = try self.keys.lookup(data, s);
+    fn effectiveValue(self: *DocumentValidator, found: rfc7951.MemberKeys.Lookup, s: *const Statement) Error!?Val {
         if (found.json_key != null) return found.value;
         // Schema defaults are YANG lexical text; integer typedefs and unions decode here.
         const d = schema_nav.default(s) orelse return null;
@@ -432,7 +486,36 @@ pub const DocumentValidator = struct {
 
     // -- tree walk -------------------------------------------------------------------------
 
-    const NameSet = std.StringHashMapUnmanaged(void);
+    const NameSet = struct {
+        obj: *const Object,
+        bits: u64 = 0,
+        overflow: std.StringHashMapUnmanaged(void) = .empty,
+        count: usize = 0,
+        force_map: bool = false,
+
+        fn put(self: *NameSet, a: Allocator, key: []const u8, _: void) error{OutOfMemory}!void {
+            const index = self.obj.getIndex(key) orelse return;
+            try self.mark(a, key, index);
+        }
+        fn mark(self: *NameSet, a: Allocator, key: []const u8, index: usize) error{OutOfMemory}!void {
+            if (!self.force_map and self.obj.count() <= 64) {
+                const bit = @as(u64, 1) << @as(u6, @intCast(index));
+                if (self.bits & bit == 0) self.count += 1;
+                self.bits |= bit;
+            } else {
+                const entry = try self.overflow.getOrPut(a, key);
+                if (!entry.found_existing) {
+                    entry.value_ptr.* = {};
+                    self.count += 1;
+                }
+            }
+        }
+        fn contains(self: *const NameSet, key: []const u8) bool {
+            if (self.force_map or self.obj.count() > 64) return self.overflow.contains(key);
+            const index = self.obj.getIndex(key) orelse return false;
+            return self.bits & (@as(u64, 1) << @as(u6, @intCast(index))) != 0;
+        }
+    };
 
     /// Name this node's children relative to the module that defines it (RFC 7951 §4). Returns the previous parent.
     fn enter(self: *DocumentValidator, s: *const Statement) []const u8 {
@@ -445,15 +528,37 @@ pub const DocumentValidator = struct {
         if (data != .object) return;
         const obj = data.object;
         const child_enforce = childEnforce(owner, enforce);
-        var visited: NameSet = .empty;
+        var visited: NameSet = .{ .obj = obj };
+        defer visited.overflow.deinit(self.a);
         for (owner.statements()) |s| {
             if (s.kind() == .rpc or s.kind() == .action) continue;
             if (s.kind() == .choice) {
                 try self.choiceInstanceKeys(s, obj, &visited);
-            } else if (try self.keys.key(s)) |k| {
-                try visited.put(self.a, k, {});
+                try self.visitStmt(s, obj, path, child_enforce, parent, null);
+            } else {
+                var found: rfc7951.MemberKeys.Lookup = .{ .value = .null, .json_key = null };
+                if (try self.keys.key(s)) |k| if (obj.getIndex(k)) |index| {
+                    try visited.mark(self.a, k, index);
+                    found = .{ .value = obj.values()[index], .json_key = k };
+                };
+                try self.visitStmt(s, obj, path, child_enforce, parent, found);
             }
-            try self.visitStmt(s, obj, path, child_enforce, parent);
+        }
+        if (visited.count == obj.count()) {
+            if (builtin.mode == .debug and obj.count() <= 64) {
+                var check: NameSet = .{ .obj = obj, .force_map = true };
+                defer check.overflow.deinit(self.a);
+                for (owner.statements()) |s| {
+                    if (s.kind() == .rpc or s.kind() == .action) continue;
+                    if (s.kind() == .choice) {
+                        try self.choiceInstanceKeys(s, obj, &check);
+                    } else if (try self.keys.key(s)) |k| {
+                        try check.put(self.a, k, {});
+                    }
+                }
+                std.debug.assert(check.count == obj.count());
+            }
+            return;
         }
         for (obj.keys()) |key| {
             if (visited.contains(key) or @import("../encoding/annotations.zig").isAnnotation(key, self.annotations)) continue;
@@ -461,7 +566,7 @@ pub const DocumentValidator = struct {
         }
     }
 
-    fn visitStmt(self: *DocumentValidator, s: *Statement, data: *const Object, path: *PathBuilder, enforce: bool, parent: *const XNode) Error!void {
+    fn visitStmt(self: *DocumentValidator, s: *Statement, data: *const Object, path: *PathBuilder, enforce: bool, parent: *const XNode, lookup: ?rfc7951.MemberKeys.Lookup) Error!void {
         if (s.kind() == .choice) return self.visitChoice(s, data, path, enforce, parent);
         if (s.kind() == .case) {
             try self.case_stack.append(self.a, s);
@@ -474,20 +579,19 @@ pub const DocumentValidator = struct {
         }
 
         const name = s.name;
-        const present = try self.keys.present(data, s);
-        const found = try self.keys.lookup(data, s);
+        const found = lookup orelse try self.keys.lookup(data, s);
+        const present = found.json_key != null;
         const json_name = found.json_key orelse name;
-        const child_path = try path.child(json_name);
-        const child_pointer = try path.childPointer(json_name);
+        const loc: Location = .{ .path = path, .child = json_name };
 
         if (!try self.ifFeaturesActive(s)) {
             if (present) {
-                try self.add(child_path, child_pointer, "if-feature", try self.a.print("Node '{s}' is present but its 'if-feature' condition is false \u{2014} this node must not exist", .{name}));
+                try self.add(try loc.display(), try loc.pointer(), "if-feature", try self.a.print("Node '{s}' is present but its 'if-feature' condition is false \u{2014} this node must not exist", .{name}));
             }
             return;
         }
 
-        const val = try self.effectiveValue(data, s);
+        const val = try self.effectiveValue(found, s);
         const curr = try parent.step(self.a, val orelse .null, .{ .stmt = s });
 
         if (s.hasWhen()) if (s.when) |w| {
@@ -495,7 +599,7 @@ pub const DocumentValidator = struct {
             const ok = try self.evalExpr(w.ast, if (w.evaluate_with_parent_context) parent else curr) orelse true;
             if (!ok) {
                 if (present) {
-                    try self.addExpr(child_path, child_pointer, "when", try self.a.print("Node '{s}' is present but its 'when' condition evaluates to false \u{2014} this node must not exist", .{name}), w.expression);
+                    try self.addExpr(try loc.display(), try loc.pointer(), "when", try self.a.print("Node '{s}' is present but its 'when' condition evaluates to false \u{2014} this node must not exist", .{name}), w.expression);
                 }
                 return;
             }
@@ -504,27 +608,27 @@ pub const DocumentValidator = struct {
         if (present) {
             const v = val orelse Val.null;
             if (isContainerKind(s) and v != .object) {
-                try self.add(child_path, child_pointer, "type", "container must be an object");
+                try self.add(try loc.display(), try loc.pointer(), "type", "container must be an object");
                 return;
             }
             if (s.kind() == .list) {
                 if (v != .array) {
-                    try self.add(child_path, child_pointer, "type", "list must be an array");
+                    try self.add(try loc.display(), try loc.pointer(), "type", "list must be an array");
                     return;
                 }
                 for (v.array, 0..) |entry, i| {
                     if (entry != .object) {
-                        try self.add(try self.a.print("{s}[{d}]", .{ child_path, i }), try self.a.print("{s}/{d}", .{ child_pointer, i }), "type", "list item must be an object");
+                        try self.add(try self.a.print("{s}[{d}]", .{ try loc.display(), i }), try self.a.print("{s}/{d}", .{ try loc.pointer(), i }), "type", "list item must be an object");
                     }
                 }
             }
             if (s.kind() == .leaf_list and v != .array) {
-                try self.add(child_path, child_pointer, "type", "leaf-list must be an array");
+                try self.add(try loc.display(), try loc.pointer(), "type", "leaf-list must be an array");
                 return;
             }
         }
 
-        if (!try self.checkStructural(s, name, data, val, present, child_path, child_pointer, enforce)) {
+        if (!try self.checkStructural(s, name, data, val, present, loc, enforce)) {
             if (isContainerKind(s) and presence(s) == null and !present) {
                 // RFC 7950 7.5.1: a non-presence container exists implicitly.
                 try path.push(name, null, null, json_name);
@@ -545,23 +649,22 @@ pub const DocumentValidator = struct {
                 const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
                 for (items, 0..) |item, i| {
                     const item_node = try parent.step(self.a, item, .{ .stmt = s });
-                    try self.checkMust(s, item_node, try self.a.print("{s}[{d}]", .{ child_path, i }), try self.a.print("{s}/{d}", .{ child_pointer, i }));
+                    try self.checkMust(s, item_node, .{ .path = path, .child = json_name, .index = i });
                 }
             } else {
-                try self.checkMust(s, curr, child_path, child_pointer);
+                try self.checkMust(s, curr, loc);
             }
         }
 
         if (s.kind() == .leaf) if (leafType(s)) |t| if (val) |v| if (v != .null) {
-            for (try self.checker.checkIn(v, t, self.context(curr))) |i| try self.add(child_path, child_pointer, i.code, i.message);
+            for (try self.checker.checkIn(v, t, self.context(curr))) |i| try self.add(try loc.display(), try loc.pointer(), i.code, i.message);
         };
         if (s.kind() == .leaf_list) if (leafType(s)) |t| {
             const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
             for (items, 0..) |item, i| {
-                const item_path = try self.a.print("{s}[{d}]", .{ child_path, i });
-                const item_pointer = try self.a.print("{s}/{d}", .{ child_pointer, i });
+                const item_loc: Location = .{ .path = path, .child = json_name, .index = i };
                 const item_node = try parent.step(self.a, item, .{ .stmt = s });
-                for (try self.checker.checkIn(item, t, self.context(item_node))) |iss| try self.add(item_path, item_pointer, iss.code, iss.message);
+                for (try self.checker.checkIn(item, t, self.context(item_node))) |iss| try self.add(try item_loc.display(), try item_loc.pointer(), iss.code, iss.message);
             }
         };
 
@@ -573,18 +676,18 @@ pub const DocumentValidator = struct {
             defer self.keys.parent_module = saved;
             try self.visitChildren(v, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), curr);
         } else if (s.kind() == .list and v == .array) {
-            const key_names = try keyNames(self.a, s);
-            try self.checkListKeyUniqueness(v.array, key_names, name, child_path, child_pointer);
-            try self.checkListUnique(s, v.array, child_path, child_pointer);
+            const key_names = try self.preparedKeyNames(s);
+            try self.checkListKeyUniqueness(v.array, key_names, name, loc);
+            try self.checkListUnique(s, v.array, loc);
             for (v.array, 0..) |entry, i| {
                 if (entry != .object) continue;
-                try path.push(name, try self.entryKey(entry.object, key_names), i, json_name);
+                try path.pushEntry(name, entry.object, key_names, i, json_name);
                 defer path.pop();
                 for (key_names) |k| {
                     if (!entry.object.contains(k)) try self.add(try self.a.print("{s}/{s}", .{ try path.current(), k }), try self.a.print("{s}/{s}", .{ try path.pointer(), k }), "mandatory", try self.a.print("Missing list key '{s}'", .{k}));
                 }
                 const entry_node = try xpath.node.newNode(self.a, entry, .{ .stmt = s }, parent);
-                try self.checkMust(s, entry_node, try path.current(), try path.pointer());
+                try self.checkMust(s, entry_node, .{ .path = path });
                 const saved = self.enter(s);
                 defer self.keys.parent_module = saved;
                 try self.visitChildren(entry, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), entry_node);
@@ -597,15 +700,14 @@ pub const DocumentValidator = struct {
         const key = s.data.list.key orelse return out.items;
         var it = std.mem.tokenizeAny(u8, key, &std.ascii.whitespace);
         while (it.next()) |k| try out.append(a, k);
-        return out.items;
+        return out.toOwnedSlice(a);
     }
 
-    /// `_entry_key_from_names`: `k='v', ...` for the display path, or null.
-    fn entryKey(self: *DocumentValidator, entry: *const Object, key_names: []const []const u8) error{OutOfMemory}!?[]const u8 {
-        if (key_names.len == 0) return null;
-        var parts: std.ArrayList([]const u8) = .empty;
-        for (key_names) |k| try parts.append(self.a, try self.a.print("{s}='{f}'", .{ k, jv.pyStr(entry.get(k) orelse .null) }));
-        return try std.mem.join(self.a, ", ", parts.items);
+    fn preparedKeyNames(self: *DocumentValidator, s: *const Statement) error{OutOfMemory}![]const []const u8 {
+        if (self.prepared.list_keys.get(s)) |keys| return keys;
+        const keys = try keyNames(self.a, s);
+        try self.prepared.list_keys.put(self.a, s, keys);
+        return keys;
     }
 
     /// `_stmt_instance_keys_from_data`.
@@ -685,11 +787,11 @@ pub const DocumentValidator = struct {
             _ = self.case_stack.pop();
         }
         const inner = childEnforce(.{ .stmt = case }, enforce);
-        for (case.statements.items) |s| try self.visitStmt(s, data, path, inner, parent);
+        for (case.statements.items) |s| try self.visitStmt(s, data, path, inner, parent, null);
     }
 
     /// `_check_structural`: false when the node is absent and nothing further applies.
-    fn checkStructural(self: *DocumentValidator, s: *const Statement, name: []const u8, data: *const Object, effective: ?Val, present: bool, path: []const u8, pointer: []const u8, enforce: bool) Error!bool {
+    fn checkStructural(self: *DocumentValidator, s: *const Statement, name: []const u8, data: *const Object, effective: ?Val, present: bool, loc: Location, enforce: bool) Error!bool {
         _ = data;
         const eff_present = if (effective) |e| e != .null else false;
         switch (s.kind()) {
@@ -697,7 +799,7 @@ pub const DocumentValidator = struct {
                 if (leafType(s)) |t| if (std.mem.eql(u8, t.name, registry.EMPTY) and present) return true;
                 if (!eff_present and mandatoryOf(s)) {
                     if (try self.leafMandatoryMustExist(enforce)) {
-                        try self.add(path, pointer, "mandatory", try self.a.print("Mandatory leaf '{s}' is missing", .{name}));
+                        try self.add(try loc.display(), try loc.pointer(), "mandatory", try self.a.print("Mandatory leaf '{s}' is missing", .{name}));
                     }
                 }
                 return eff_present;
@@ -706,7 +808,7 @@ pub const DocumentValidator = struct {
                 if (!eff_present and mandatoryOf(s)) {
                     if (try self.leafMandatoryMustExist(enforce)) {
                         const kind = if (s.kind() == .anydata) "anydata" else "anyxml";
-                        try self.add(path, pointer, "mandatory", try self.a.print("Mandatory {s} '{s}' is missing", .{ kind, name }));
+                        try self.add(try loc.display(), try loc.pointer(), "mandatory", try self.a.print("Mandatory {s} '{s}' is missing", .{ kind, name }));
                     }
                 }
                 return eff_present;
@@ -716,10 +818,10 @@ pub const DocumentValidator = struct {
                 const min_e = if (s.kind() == .list) s.data.list.min_elements else s.data.leaf_list.min_elements;
                 const max_e = if (s.kind() == .list) s.data.list.max_elements else s.data.leaf_list.max_elements;
                 if (min_e) |m| if (@as(i64, @intCast(count)) < m) {
-                    try self.add(path, pointer, "min-elements", try self.a.print("'{s}' has {d} element(s) but requires at least {d}", .{ name, count, m }));
+                    try self.add(try loc.display(), try loc.pointer(), "min-elements", try self.a.print("'{s}' has {d} element(s) but requires at least {d}", .{ name, count, m }));
                 };
                 if (max_e) |m| if (present and @as(i64, @intCast(count)) > m) {
-                    try self.add(path, pointer, "max-elements", try self.a.print("'{s}' has {d} element(s) but allows at most {d}", .{ name, count, m }));
+                    try self.add(try loc.display(), try loc.pointer(), "max-elements", try self.a.print("'{s}' has {d} element(s) but allows at most {d}", .{ name, count, m }));
                 };
                 return present;
             },
@@ -743,7 +845,7 @@ pub const DocumentValidator = struct {
         };
     }
 
-    fn checkListKeyUniqueness(self: *DocumentValidator, entries: []const Val, key_names: []const []const u8, list_name: []const u8, path: []const u8, pointer: []const u8) Error!void {
+    fn checkListKeyUniqueness(self: *DocumentValidator, entries: []const Val, key_names: []const []const u8, list_name: []const u8, loc: Location) Error!void {
         if (key_names.len == 0) return;
         var seen: std.StringHashMapUnmanaged(usize) = .empty;
         for (entries, 0..) |entry, i| {
@@ -762,7 +864,7 @@ pub const DocumentValidator = struct {
             if (seen.get(token)) |first| {
                 var shown: std.ArrayList([]const u8) = .empty;
                 for (key_names) |k| try shown.append(self.a, try self.a.print("{s}='{f}'", .{ k, jv.pyStr(entry.object.get(k) orelse .null) }));
-                try self.add(path, pointer, "duplicate-key", try self.a.print("Duplicate key in list '{s}': {s} (entries at index {d} and {d})", .{ list_name, try std.mem.join(self.a, ", ", shown.items), first, i }));
+                try self.add(try loc.display(), try loc.pointer(), "duplicate-key", try self.a.print("Duplicate key in list '{s}': {s} (entries at index {d} and {d})", .{ list_name, try std.mem.join(self.a, ", ", shown.items), first, i }));
                 return;
             }
             try seen.put(self.a, token, i);
@@ -786,7 +888,7 @@ pub const DocumentValidator = struct {
     }
 
     /// RFC 7950 7.8.3: one error per `unique` set whose values repeat across entries.
-    fn checkListUnique(self: *DocumentValidator, s: *const Statement, entries: []const Val, path: []const u8, pointer: []const u8) Error!void {
+    fn checkListUnique(self: *DocumentValidator, s: *const Statement, entries: []const Val, loc: Location) Error!void {
         for (s.data.list.unique.items) |paths| {
             var seen: std.StringHashMapUnmanaged(usize) = .empty;
             entry_loop: for (entries, 0..) |entry, i| {
@@ -796,7 +898,7 @@ pub const DocumentValidator = struct {
                 if (seen.get(token)) |first| {
                     var shown: std.ArrayList([]const u8) = .empty;
                     for (paths, values.items) |p, v| try shown.append(self.a, try self.a.print("{s}='{s}'", .{ p, try self.uniqueDisplay(v) }));
-                    try self.add(path, pointer, "unique", try self.a.print("Unique constraint violated in list '{s}': {s} (entries at index {d} and {d})", .{ s.name, try std.mem.join(self.a, ", ", shown.items), first, i }));
+                    try self.add(try loc.display(), try loc.pointer(), "unique", try self.a.print("Unique constraint violated in list '{s}': {s} (entries at index {d} and {d})", .{ s.name, try std.mem.join(self.a, ", ", shown.items), first, i }));
                     break;
                 }
                 try seen.put(self.a, token, i);
@@ -806,3 +908,91 @@ pub const DocumentValidator = struct {
 };
 
 var empty_object: Object = .empty;
+
+test "multi-key list errors retain display path and pointer" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module m { namespace 'urn:m'; prefix m;
+        \\ container top { list items { key 'id zone';
+        \\ leaf id { type string; } leaf zone { type string; }
+        \\ leaf required { mandatory true; type string; }
+        \\ } } }
+    , "test.yang", &diag);
+    var msg: []const u8 = "";
+    const data = try jv.parse(a, "{\"m:top\":{\"items\":[{\"id\":\"i\",\"zone\":\"z\",\"bad\":1}]}}", &msg);
+    var validator = @import("yang_validator.zig").YangValidator.init(a, module);
+    const result = try validator.validate(data, .{});
+    var mandatory = false;
+    var unknown = false;
+    for (result.errors) |err| {
+        if (std.mem.eql(u8, err.code, "mandatory")) {
+            mandatory = true;
+            try std.testing.expectEqualStrings("/top/items[id='i', zone='z']/required", err.path);
+            try std.testing.expectEqualStrings("/m:top/items/0/required", err.pointer);
+        }
+        if (std.mem.eql(u8, err.code, "unknown-field")) {
+            unknown = true;
+            try std.testing.expectEqualStrings("/top/items[id='i', zone='z']/bad", err.path);
+            try std.testing.expectEqualStrings("/m:top/items/0/bad", err.pointer);
+        }
+    }
+    try std.testing.expect(mandatory and unknown);
+}
+
+test "visited keys use the large-object fallback" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var obj: Object = .empty;
+    for (0..65) |i| try obj.put(a, try a.print("k{d}", .{i}), .null);
+    var visited: DocumentValidator.NameSet = .{ .obj = &obj };
+    try visited.put(a, "k64", {});
+    try std.testing.expect(visited.contains("k64"));
+    try std.testing.expect(!visited.contains("k63"));
+    try std.testing.expectEqual(@as(usize, 1), visited.count);
+}
+
+test "prepared feature guards retain errors in list entries" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module m { namespace 'urn:m'; prefix m; feature f;
+        \\ list items { key 'id'; leaf id { type string; }
+        \\ leaf guarded { if-feature f; type string; } } }
+    , "test.yang", &diag);
+    var msg: []const u8 = "";
+    const data = try jv.parse(a, "{\"m:items\":[{\"id\":\"a\",\"guarded\":\"x\"},{\"id\":\"b\",\"guarded\":\"y\"}]}", &msg);
+    var features: if_feature_eval.EnabledFeatures = .empty;
+    try features.put(a, "m", .empty);
+    var validator = @import("yang_validator.zig").YangValidator.init(a, module);
+    const result = try validator.validate(data, .{ .enabled_features_by_module = &features });
+    var count: usize = 0;
+    for (result.errors) |err| if (std.mem.eql(u8, err.code, "if-feature")) {
+        count += 1;
+    };
+    try std.testing.expectEqual(@as(usize, 2), count);
+}
+
+test "choice members and unknown fields remain distinct" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module m { namespace 'urn:m'; prefix m; container top {
+        \\ choice pick { case first { leaf a { type string; } }
+        \\ case second { leaf b { type string; } } } } }
+    , "test.yang", &diag);
+    var msg: []const u8 = "";
+    const data = try jv.parse(a, "{\"m:top\":{\"a\":\"yes\",\"extra\":1}}", &msg);
+    var validator = @import("yang_validator.zig").YangValidator.init(a, module);
+    const result = try validator.validate(data, .{});
+    try std.testing.expectEqual(@as(usize, 1), result.errors.len);
+    try std.testing.expectEqualStrings("unknown-field", result.errors[0].code);
+    try std.testing.expectEqualStrings("/m:top/extra", result.errors[0].pointer);
+}

@@ -61,6 +61,7 @@ const Band = struct { lo: ?Num, hi: ?Num };
 pub const TypeChecker = struct {
     a: Allocator,
     regex_scratch: regex.Regex.Scratch = .{},
+    range_cache: std.StringHashMapUnmanaged([]const Band) = .empty,
     assume_ascii: bool = false,
     /// `root_schema`: the host module the validator runs against.
     root: *Module,
@@ -76,6 +77,14 @@ pub const TypeChecker = struct {
     enabled: ?*const if_feature_eval.EnabledFeatures = null,
     /// Used when the type has no `scope`.
     feature_module: ?*Module = null,
+
+    pub fn deinit(self: *TypeChecker) void {
+        self.regex_scratch.deinit(self.a);
+        var it = self.range_cache.valueIterator();
+        while (it.next()) |bands| self.a.free(bands.*);
+        self.range_cache.deinit(self.a);
+        self.range_cache = .empty;
+    }
 
     fn fail(self: *TypeChecker, err: Error, comptime fmt: []const u8, args: anytype) Error {
         self.unsupported = try self.a.print(fmt, args);
@@ -432,6 +441,7 @@ pub const TypeChecker = struct {
 
     /// `_parse_ranges`: split on `|`, then each part on `..`; `min` / `max` are open ends.
     fn parseRanges(self: *TypeChecker, text: []const u8) Error![]const Band {
+        if (self.range_cache.get(text)) |cached| return cached;
         var bands: std.ArrayList(Band) = .empty;
         var parts = std.mem.splitScalar(u8, text, '|');
         while (parts.next()) |raw| {
@@ -449,7 +459,15 @@ pub const TypeChecker = struct {
                 try bands.append(self.a, .{ .lo = n, .hi = n });
             }
         }
-        return bands.items;
+        const owned = try bands.toOwnedSlice(self.a);
+        errdefer self.a.free(owned);
+        try self.range_cache.put(self.a, text, owned);
+        return owned;
+    }
+
+    pub fn prepareRestrictions(self: *TypeChecker, t: *const TypeStmt) Error!void {
+        if (t.rangeRestriction().expression) |text| _ = try self.parseRanges(text);
+        if (t.lengthRestriction().expression) |text| _ = try self.parseRanges(text);
     }
 
     const Miss = struct { min: bool, bound: Num };

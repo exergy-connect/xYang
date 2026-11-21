@@ -20,18 +20,30 @@ pub fn definingModuleName(stmt: *const Statement, parent_module: []const u8) []c
 pub const MemberKeys = struct {
     a: Allocator,
     parent_module: []const u8,
-    cache: std.AutoHashMapUnmanaged(*const Statement, CacheEntry) = .empty,
+    cache: std.HashMapUnmanaged(CacheKey, ?[]const u8, CacheContext, std.hash_map.default_max_load_percentage) = .empty,
 
-    const CacheEntry = struct { parent: []const u8, key: ?[]const u8 };
+    const CacheKey = struct { stmt: *const Statement, parent: []const u8 };
+    const CacheContext = struct {
+        pub fn hash(_: CacheContext, k: CacheKey) u64 {
+            var h = std.hash.Wyhash.init(0);
+            std.hash.autoHash(&h, @intFromPtr(k.stmt));
+            h.update(k.parent);
+            return h.final();
+        }
+        pub fn eql(_: CacheContext, a: CacheKey, b: CacheKey) bool {
+            return a.stmt == b.stmt and std.mem.eql(u8, a.parent, b.parent);
+        }
+    };
 
     pub fn key(self: *MemberKeys, stmt: *const Statement) error{OutOfMemory}!?[]const u8 {
-        if (self.cache.get(stmt)) |hit| if (std.mem.eql(u8, hit.parent, self.parent_module)) return hit.key;
+        const cache_key: CacheKey = .{ .stmt = stmt, .parent = self.parent_module };
+        if (self.cache.getEntry(cache_key)) |hit| return hit.value_ptr.*;
         const k: ?[]const u8 = if (stmt.name.len == 0) null else blk: {
             const def = definingModuleName(stmt, self.parent_module);
             if (std.mem.eql(u8, def, self.parent_module)) break :blk stmt.name;
             break :blk try self.a.print("{s}:{s}", .{ def, stmt.name });
         };
-        try self.cache.put(self.a, stmt, .{ .parent = self.parent_module, .key = k });
+        try self.cache.put(self.a, cache_key, k);
         return k;
     }
 
