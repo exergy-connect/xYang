@@ -382,12 +382,8 @@ pub const TypeChecker = struct {
             if (try self.rangeIssue(.{ .float = n }, range, t.rangeRestriction().error_message, t.rangeRestriction().error_app_tag)) |i| return self.one(i);
         }
         if (t.fractionDigits()) |fd| if (fd >= 0) {
-            const text = try self.a.print("{f}", .{jv.pyStr(value)});
-            const s = std.mem.trim(u8, text, &std.ascii.whitespace);
-            if (std.mem.findScalar(u8, s, '.')) |dot| {
-                if (s.len - dot - 1 > fd) {
-                    return self.issue("fraction-digits", "Value has more than {d} fraction digits (decimal64 fraction-digits)", .{fd});
-                }
+            if (fractionTextLen(value) > fd) {
+                return self.issue("fraction-digits", "Value has more than {d} fraction digits (decimal64 fraction-digits)", .{fd});
             }
         };
         return &.{};
@@ -395,8 +391,14 @@ pub const TypeChecker = struct {
 
     fn checkBinary(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
         if (try registry.get(registry.BINARY).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
-        const s = std.mem.trim(u8, value.string, &pyWhitespace);
-        const decoded_len = base64DecodedLen(s) orelse return self.issue("type", "binary value is not valid base64", .{});
+        const raw = value.string;
+        const s = std.mem.trim(u8, raw, &pyWhitespace);
+        // Only a string that is already unpadded and free of whitespace is a
+        // StrictBase64x64. Padding and whitespace stay on the strict decoder.
+        const decoded_len: usize = if (StrictBase64x64.admits(raw))
+            StrictBase64x64.initTrusted(raw).decodedLen()
+        else
+            base64DecodedLen(s) orelse return self.issue("type", "binary value is not valid base64", .{});
         if (t.lengthRestriction().expression) |length| {
             if (try self.lengthIssue(@intCast(decoded_len), length, true, t.lengthRestriction().error_message, t.lengthRestriction().error_app_tag)) |i| return self.one(i);
         }
@@ -514,6 +516,22 @@ fn toNum(s: []const u8) ?Num {
     return null;
 }
 
+/// Characters after `'.'` in `str(value)`, the fraction-digits count.
+fn fractionTextLen(value: Val) usize {
+    switch (value) {
+        .decimal => |d| return jv.Decimal64Core.from(d).fractionLen(),
+        .int => return 0,
+        .float => |f| {
+            var buf: [128]u8 = undefined;
+            const text = std.mem.print(&buf, "{f}", .{jv.floatRepr(f)}) catch unreachable;
+            const s = std.mem.trim(u8, text, &std.ascii.whitespace);
+            const dot = std.mem.findScalar(u8, s, '.') orelse return 0;
+            return s.len - dot - 1;
+        },
+        else => unreachable,
+    }
+}
+
 /// `int(Decimal)`: truncation toward zero.
 fn truncDecimal(d: jv.Decimal) i128 {
     var digits = d.digits;
@@ -527,6 +545,59 @@ fn truncDecimal(d: jv.Decimal) i128 {
     while (e > 0) : (e -= 1) v = std.math.mul(i128, v, 10) catch std.math.maxInt(i128);
     return if (d.negative) -v else v;
 }
+
+fn base64AlphabetOnly(bytes: []const u8) bool {
+    for (bytes) |c| {
+        if (!(std.ascii.isAlphanumeric(c) or c == '+' or c == '/')) return false;
+    }
+    return true;
+}
+
+/// Strict base64: alphabet and padding checked, no whitespace. `decodedLen` is the
+/// CPython strict length. Callers that still have `=` or whitespace must not use
+/// `StrictBase64x64`.
+pub const StrictBase64 = struct {
+    bytes: []const u8,
+
+    pub fn initTrusted(bytes: []const u8) StrictBase64 {
+        if (@import("builtin").mode == .debug) {
+            std.debug.assert(std.mem.indexOfAny(u8, bytes, &pyWhitespace) == null);
+            std.debug.assert(base64DecodedLen(bytes) != null);
+        }
+        return .{ .bytes = bytes };
+    }
+
+    pub fn decodedLen(self: StrictBase64) usize {
+        return base64DecodedLen(self.bytes).?;
+    }
+};
+
+/// Unpadded base64 whose length is a multiple of 64. Decoded length is
+/// `(len >> 6) * 48` with no scan.
+pub const StrictBase64x64 = struct {
+    bytes: []const u8,
+
+    pub fn admits(bytes: []const u8) bool {
+        return bytes.len % 64 == 0 and
+            std.mem.indexOfScalar(u8, bytes, '=') == null and
+            std.mem.indexOfAny(u8, bytes, &pyWhitespace) == null and
+            base64AlphabetOnly(bytes);
+    }
+
+    pub fn initTrusted(bytes: []const u8) StrictBase64x64 {
+        if (@import("builtin").mode == .debug) {
+            std.debug.assert(bytes.len % 64 == 0);
+            std.debug.assert(std.mem.indexOfScalar(u8, bytes, '=') == null);
+            std.debug.assert(std.mem.indexOfAny(u8, bytes, &pyWhitespace) == null);
+            std.debug.assert(base64AlphabetOnly(bytes));
+        }
+        return .{ .bytes = bytes };
+    }
+
+    pub fn decodedLen(self: StrictBase64x64) usize {
+        return (self.bytes.len >> 6) * 48;
+    }
+};
 
 /// `base64.b64decode(s, validate=True)` (CPython strict `a2b_base64`): decoded length, or
 /// null when Python raises `binascii.Error`.
@@ -570,6 +641,38 @@ pub fn base64DecodedLen(s: []const u8) ?usize {
     }
     if (quad_pos != 0) return null;
     return out;
+}
+
+test "StrictBase64x64 length is constant and rejects pad or whitespace" {
+    const empty = StrictBase64x64.initTrusted("");
+    try std.testing.expectEqual(@as(usize, 0), empty.decodedLen());
+
+    var block: [64]u8 = undefined;
+    @memset(&block, 'A');
+    const aligned = StrictBase64x64.initTrusted(&block);
+    try std.testing.expectEqual(@as(usize, 48), aligned.decodedLen());
+    try std.testing.expectEqual(base64DecodedLen(&block).?, aligned.decodedLen());
+
+    const padded = StrictBase64.initTrusted("YQ==");
+    try std.testing.expectEqual(@as(usize, 1), padded.decodedLen());
+    try std.testing.expect(!StrictBase64x64.admits("YQ=="));
+
+    var bad: [64]u8 = undefined;
+    @memset(&bad, 'A');
+    bad[63] = '=';
+    try std.testing.expect(!StrictBase64x64.admits(&bad));
+    bad[63] = 'A';
+    bad[0] = ' ';
+    try std.testing.expect(!StrictBase64x64.admits(&bad));
+    bad[0] = 'A';
+    bad[10] = '\n';
+    try std.testing.expect(!StrictBase64x64.admits(&bad));
+    if (@import("builtin").mode == .debug) {
+        // initTrusted asserts length, alphabet, and no pad or whitespace.
+        // These inputs fail that assert, so they are not proclaimed.
+        try std.testing.expect(!StrictBase64x64.admits(&bad));
+        try std.testing.expect(!StrictBase64x64.admits("===="));
+    }
 }
 
 test "base64 strictness follows CPython" {

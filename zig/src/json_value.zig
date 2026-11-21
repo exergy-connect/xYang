@@ -33,7 +33,12 @@ pub const Decimal = struct {
             exponent = std.fmt.parseInt(i32, s[e + 1 ..], 10) catch return error.InvalidDecimal;
             s = s[0..e];
         }
-        var coeff: std.ArrayList(u8) = .empty;
+        // Mantissas of 64 digits or fewer stay in a stack buffer. Longer ones
+        // fall back to the heap. The returned digits are allocator-owned, or the
+        // static "0", never a pointer into that stack buffer.
+        var stack: [64]u8 = undefined;
+        var n: usize = 0;
+        var heap: std.ArrayList(u8) = .empty;
         var seen_dot = false;
         for (s) |c| {
             if (c == '.') {
@@ -43,11 +48,19 @@ pub const Decimal = struct {
             }
             if (c < '0' or c > '9') return error.InvalidDecimal;
             if (seen_dot) exponent -= 1;
-            try coeff.append(a, c);
+            if (heap.items.len == 0 and n < stack.len) {
+                stack[n] = c;
+                n += 1;
+            } else {
+                if (heap.items.len == 0) try heap.appendSlice(a, stack[0..n]);
+                try heap.append(a, c);
+            }
         }
-        if (coeff.items.len == 0) return error.InvalidDecimal;
-        var digits = std.mem.trimStart(u8, coeff.items, "0");
-        if (digits.len == 0) digits = "0";
+        const raw: []const u8 = if (heap.items.len != 0) heap.items else stack[0..n];
+        if (raw.len == 0) return error.InvalidDecimal;
+        var digits = std.mem.trimStart(u8, raw, "0");
+        if (digits.len == 0) return .{ .negative = negative, .digits = "0", .exponent = exponent };
+        if (heap.items.len == 0) digits = try a.dupe(u8, digits);
         return .{ .negative = negative, .digits = digits, .exponent = exponent };
     }
 
@@ -108,6 +121,36 @@ pub const Decimal = struct {
         return if (self.negative) -v else v;
     }
 };
+
+/// Coefficient and scale of a parsed decimal, used to count fraction digits
+/// without printing the value.
+pub const Decimal64Core = struct {
+    digits: []const u8,
+    exponent: i32,
+
+    pub fn from(d: Decimal) Decimal64Core {
+        return .{ .digits = d.digits, .exponent = d.exponent };
+    }
+
+    /// Characters after `'.'` in `str(Decimal)`, including a scientific suffix.
+    pub fn fractionLen(self: Decimal64Core) usize {
+        const n: i64 = @intCast(self.digits.len);
+        const leftdigits: i64 = @as(i64, self.exponent) + n;
+        const dotplace: i64 = if (self.exponent <= 0 and leftdigits > -6) leftdigits else 1;
+        if (dotplace <= 0) return @intCast(-dotplace + n);
+        if (dotplace >= n) return 0;
+        var frac: usize = @intCast(n - dotplace);
+        if (leftdigits != dotplace) frac += 2 + decimalDigitCount(@abs(leftdigits - dotplace));
+        return frac;
+    }
+};
+
+fn decimalDigitCount(v: u64) usize {
+    var count: usize = 1;
+    var x = v;
+    while (x > 9) : (x /= 10) count += 1;
+    return count;
+}
 
 pub const Val = union(enum) {
     null,
@@ -499,4 +542,34 @@ test "python text of values" {
     try std.testing.expect(pyEql(.{ .int = 1 }, .{ .bool = true }));
     try std.testing.expect(pyEql(.{ .int = 1 }, .{ .float = 1.0 }));
     try std.testing.expectEqualStrings("Decimal('1.5')", try std.mem.print(&buf, "{f}", .{pyRepr(.{ .decimal = try Decimal.parse(a, "1.5") })}));
+}
+
+fn scannedFractionLen(text: []const u8) usize {
+    const s = std.mem.trim(u8, text, &std.ascii.whitespace);
+    const dot = std.mem.findScalar(u8, s, '.') orelse return 0;
+    return s.len - dot - 1;
+}
+
+test "decimal fraction-digits match the printed coefficient" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var buf: [128]u8 = undefined;
+    const cases = [_]struct { []const u8, usize }{
+        .{ "1.50", 2 },
+        .{ "1e-5", 5 },
+        .{ "0.0", 1 },
+    };
+    for (cases) |c| {
+        const d = try Decimal.parse(a, c[0]);
+        const printed = try std.mem.print(&buf, "{f}", .{d});
+        const scanned = scannedFractionLen(printed);
+        try std.testing.expectEqual(c[1], scanned);
+        try std.testing.expectEqual(scanned, Decimal64Core.from(d).fractionLen());
+    }
+    var big: [65]u8 = undefined;
+    @memset(&big, '9');
+    const wide = try Decimal.parse(a, &big);
+    try std.testing.expectEqual(@as(usize, 65), wide.digits.len);
+    try std.testing.expectEqual(scannedFractionLen(try std.mem.print(&buf, "{f}", .{wide})), Decimal64Core.from(wide).fractionLen());
 }
