@@ -1453,12 +1453,40 @@ export type SchemaExportOptions = AnnotationOptions & {
   nativeJson?: boolean;
   /** Schema resource URI. Defaults to the YANG namespace; leaves x-yang.namespace unchanged. */
   schemaId?: string;
+  /**
+   * false omits the x-yang and x-fraction-digits extension keywords: a plain JSON
+   * Schema for other tools, which parseJsonSchema cannot read back. Default true.
+   */
+  xYang?: boolean;
 };
+
+/** Keywords whose object values map names (YANG nodes, typedefs) to schemas. */
+const NAME_MAPS = new Set(["properties", "patternProperties", "$defs", "dependentSchemas"]);
+const XYANG_KEYWORDS = new Set([YANG_SCHEMA_KEYS.xYang, "x-fraction-digits"]);
+
+/** A copy of a schema without its xYang extension keywords; data names in name maps stay. */
+export function withoutXYang(value: unknown, names = false): unknown {
+  if (Array.isArray(value)) return value.map(child => withoutXYang(child));
+  if (!value || typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (names) { out[key] = withoutXYang(child); continue; }
+    if (XYANG_KEYWORDS.has(key)) continue;
+    out[key] = withoutXYang(child, NAME_MAPS.has(key));
+  }
+  return out;
+}
 
 export type SchemaDiagnostic = { path: string; constraint: string; expression: string; reason: string };
 export type SchemaExportResult = { schema: Record<string, unknown>; diagnostics: SchemaDiagnostic[] };
 
 export function generateJsonSchema(module: YangModule, options: SchemaExportOptions = {}): SchemaExportResult {
+  const result = generateAnnotatedJsonSchema(module, options);
+  if (options.xYang !== false) return result;
+  return { schema: withoutXYang(result.schema) as Record<string, unknown>, diagnostics: result.diagnostics };
+}
+
+function generateAnnotatedJsonSchema(module: YangModule, options: SchemaExportOptions): SchemaExportResult {
 
   const previousNative = exportNativeJson;
   const previous = extensionUses;

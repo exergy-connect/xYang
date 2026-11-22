@@ -379,6 +379,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     convert_parser.add_argument("--native-json", action="store_true",
                                 help="Export int64/uint64 as integers and decimal64 as numbers (default: RFC 7951 strings)")
+    convert_parser.add_argument("--no-x-yang", dest="x_yang", action="store_false",
+                                help="Omit xYang annotations (x-yang, x-fraction-digits): a plain JSON Schema that cannot be converted back to YANG")
     jsonld = convert_parser.add_mutually_exclusive_group()
     jsonld.add_argument("--jsonld", action="store_true", help="Export a JSON-LD 1.1 context instead of JSON Schema")
     jsonld.add_argument("--jsonld-vocab", action="store_true", help="Export a JSON-LD vocabulary instead of JSON Schema")
@@ -521,7 +523,7 @@ def main() -> int:
             return 2
 
     if args.cmd == "convert":
-        if (args.jsonld or args.jsonld_vocab) and (args.schema_id is not None or args.native_json or not args.allow_jsonld or not args.allow_json_schema):
+        if (args.jsonld or args.jsonld_vocab) and (args.schema_id is not None or args.native_json or not args.x_yang or not args.allow_jsonld or not args.allow_json_schema):
             parser.error("JSON-LD output cannot be combined with JSON Schema export options")
         from xyang.parser import YangParser
         from xyang.json import schema_to_yang_json
@@ -546,7 +548,8 @@ def main() -> int:
                 out.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
             else:
                 schema_to_yang_json(module, output_path=out, schema_id=args.schema_id,
-                                    allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, native_json=args.native_json)
+                                    allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, native_json=args.native_json,
+                                    x_yang=args.x_yang)
             print(f"Wrote {out}")
         except YangExportError as e:
             _print_cli_error(e)
