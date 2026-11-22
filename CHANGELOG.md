@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Plain JSON Schema export: `generate_json_schema(..., x_yang=False)` / `generateJsonSchema(module, { xYang: false })` and `convert --no-x-yang` omit the `x-yang` and `x-fraction-digits` extension keywords, also for a subtree `path`. Data names in `properties`, `patternProperties`, `$defs` and `dependentSchemas` stay, even when a YANG node is named `x-…`. The result is for other JSON Schema tools; it cannot be read back with `parse_json_schema` / `parseJsonSchema`.
+
 ### Changed
 
 - Zig skips document XPath nodes in constraint-free subtrees and indexes schema children for named XPath steps (#281).

@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- Plain JSON Schema export: `generateJsonSchema(module, { xYang: false })` and `xyang-ts convert --no-x-yang` omit the `x-yang` and `x-fraction-digits` extension keywords, also for a subtree `path`. Data names in `properties`, `patternProperties`, `$defs` and `dependentSchemas` stay, even when a YANG node is named `x-…`. The result is for other JSON Schema tools; `parseJsonSchema` cannot read it back.
+
 ## [1.0.8] — 2026-11-21
 
 ### Added

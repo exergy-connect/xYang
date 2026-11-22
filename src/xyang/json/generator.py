@@ -1714,15 +1714,50 @@ def _apply_own_deviations(schema_module: YangModule) -> None:
 
 def generate_json_schema(module: YangModule, *, schema_id: str | None = None,
                          allow_jsonld: bool = True, allow_json_schema: bool = True, native_json: bool = False,
-                         path: str | None = None, features: Mapping[str, Collection[str]] | None = None) -> SchemaExportResult:
+                         path: str | None = None, features: Mapping[str, Collection[str]] | None = None,
+                         x_yang: bool = True) -> SchemaExportResult:
     """
     Build a JSON Schema and diagnostics from a YangModule AST.
 
     With ``path``, export the selected data node's value as a standalone schema,
     filtering features and reporting constraints outside the subtree. Without it,
     return the reversible whole-module schema and an empty diagnostics list.
+    With ``x_yang=False``, omit the ``x-yang`` and ``x-fraction-digits`` extension
+    keywords: the result is a plain JSON Schema for other tools, which
+    :func:`parse_json_schema` cannot read back.
     Raises :class:`YangExportError` for a construct the form cannot carry.
     """
+    result = _generate_json_schema_result(module, schema_id=schema_id, allow_jsonld=allow_jsonld,
+                                          allow_json_schema=allow_json_schema, native_json=native_json,
+                                          path=path, features=features)
+    if x_yang:
+        return result
+    return SchemaExportResult(without_x_yang(result.schema), result.diagnostics)
+
+
+# Keywords whose object values are maps of names (YANG node or typedef names), not schemas.
+_NAME_MAPS = frozenset({"properties", "patternProperties", "$defs", "dependentSchemas"})
+
+
+def without_x_yang(value: Any, names: bool = False) -> Any:
+    """Return a copy of a schema with its xYang extension keywords removed.
+
+    Keys of name maps such as ``properties`` are data names and stay, even when a
+    YANG node is itself named ``x-...``.
+    """
+    if isinstance(value, dict):
+        if names:
+            return {key: without_x_yang(child) for key, child in value.items()}
+        return {key: without_x_yang(child, key in _NAME_MAPS) for key, child in value.items()
+                if key not in (JsonSchemaKey.X_YANG, JsonSchemaKey.X_FRACTION_DIGITS)}
+    if isinstance(value, list):
+        return [without_x_yang(child) for child in value]
+    return value
+
+
+def _generate_json_schema_result(module: YangModule, *, schema_id: str | None,
+                                 allow_jsonld: bool, allow_json_schema: bool, native_json: bool,
+                                 path: str | None, features: Mapping[str, Collection[str]] | None) -> SchemaExportResult:
     from ..typedef_scope import EXPORT_TYPEDEFS, scoped_export_catalog
 
     from ..types.registry import NATIVE_EXPORT
@@ -1843,6 +1878,7 @@ def schema_to_yang_json(
     allow_jsonld: bool = True,
     allow_json_schema: bool = True,
     native_json: bool = False,
+    x_yang: bool = True,
 ) -> str:
     """
     Serialize YangModule to JSON Schema string (and optionally write to file).
@@ -1856,7 +1892,8 @@ def schema_to_yang_json(
     Returns:
         JSON string of the schema.
     """
-    data = generate_json_schema(module, schema_id=schema_id, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema, native_json=native_json).schema
+    data = generate_json_schema(module, schema_id=schema_id, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema,
+                                native_json=native_json, x_yang=x_yang).schema
     text = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
     if output_path is not None:
         path = Path(output_path)

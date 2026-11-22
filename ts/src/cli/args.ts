@@ -38,7 +38,7 @@ export class CliUsageError extends Error {
 }
 
 type IncludeState = { includePaths: string[] };
-export type ConvertCliArgs = CommonCliArgs & AnnotationOptions & { schemaId?: string; nativeJson?: boolean; jsonld?: boolean; jsonldVocab?: boolean };
+export type ConvertCliArgs = CommonCliArgs & AnnotationOptions & { schemaId?: string; nativeJson?: boolean; xYang?: boolean; jsonld?: boolean; jsonldVocab?: boolean };
 type ConvertState = Omit<ConvertCliArgs, "positional">;
 
 type ValidateState = Omit<ValidateCliArgs, "positional">;
@@ -300,6 +300,10 @@ const convertCommand: CliCommand<ConvertState> = {
     help: "Export int64/uint64 as integers and decimal64 as numbers (default: RFC 7951 strings).",
     apply(state) { state.nativeJson = true; }
   }, {
+    name: "--no-x-yang", takesValue: false,
+    help: "Omit xYang annotations (x-yang, x-fraction-digits): a plain JSON Schema that cannot be converted back to YANG.",
+    apply(state) { state.xYang = false; }
+  }, {
     name: "--schema-id", metavar: "URI", takesValue: true,
     help: "Schema resource $id (default: the YANG namespace); does not change x-yang.namespace.",
     apply(state, value) {
@@ -391,7 +395,7 @@ export function parseConvertArgs(rest: string[]): ConvertCliArgs {
   const state: ConvertState = { includePaths: [] };
   const positional = collectPositionals(convertCommand, rest, state);
   if (state.jsonld && state.jsonldVocab) throw new CliUsageError("--jsonld and --jsonld-vocab are mutually exclusive");
-  if ((state.jsonld || state.jsonldVocab) && (state.schemaId !== undefined || state.nativeJson || state.allowJsonld === false || state.allowJsonSchema === false)) {
+  if ((state.jsonld || state.jsonldVocab) && (state.schemaId !== undefined || state.nativeJson || state.xYang === false || state.allowJsonld === false || state.allowJsonSchema === false)) {
     throw new CliUsageError("JSON-LD output cannot be combined with JSON Schema export options");
   }
   return { ...state, positional };
