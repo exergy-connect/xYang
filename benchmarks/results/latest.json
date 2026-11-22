@@ -1,29 +1,29 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-11-21T14:58:33+00:00",
+  "generated_at": "2026-11-22T02:58:04+00:00",
   "smoke": false,
   "environment": {
     "git": {
-      "commit": "a774b768207f33f69d9d42db26d4dabc76f5818c",
-      "describe": "v1.0.8",
+      "commit": "950bdf2dbb5e99fe8f2754b2ab7779e7c56318d9",
+      "describe": "v1.0.9",
       "dirty": false,
-      "release_tag": "v1.0.8"
+      "release_tag": "v1.0.9"
     },
     "versions": {
-      "python_package": "1.0.8",
-      "ts_package": "1.0.8"
+      "python_package": "1.0.9",
+      "ts_package": "1.0.9"
     },
     "runtimes": {
       "python": "CPython 3.12.16",
       "node": "v24.22.3"
     },
     "machine": {
-      "runner": "GitHub Actions ubuntu24 image 20261116.376.1 (X64)",
-      "os": "Linux 7.0.0-1017-azure",
+      "runner": "GitHub Actions ubuntu24 image 20261116.133.1 (X64)",
+      "os": "Linux 7.0.0-1014-aws",
       "arch": "x86_64",
-      "cpu": "Intel(R) Xeon(R) 6973P-C",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
       "cpu_count": 4,
-      "mem_total_gib": 15.6
+      "mem_total_gib": 15.3
     }
   },
   "workloads": {
@@ -72,14 +72,14 @@
       "startup": {
         "processes": 10,
         "wall_ms": {
-          "median": 134.7445584999889,
-          "min": 131.704845999991,
-          "max": 237.77799200001937
+          "median": 126.23123499999167,
+          "min": 126.0080610000216,
+          "max": 233.57615399999077
         },
         "peak_rss_mib": {
-          "median": 18.12890625,
-          "min": 18.09375,
-          "max": 22.1015625
+          "median": 18.2265625,
+          "min": 18.11328125,
+          "max": 22.2890625
         },
         "rss_source": "VmHWM"
       },
@@ -92,9 +92,9 @@
               "iterations_per_process": 30,
               "iterations": 90,
               "time_ms": {
-                "median": 10.749823,
-                "min": 9.838667,
-                "max": 19.714139
+                "median": 10.488328500000001,
+                "min": 9.983388,
+                "max": 19.077045
               }
             },
             "memory": {
@@ -102,9 +102,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 19.85546875,
-                "min": 19.73046875,
-                "max": 19.88671875
+                "median": 19.78515625,
+                "min": 19.68359375,
+                "max": 19.83984375
               },
               "rss_source": "VmHWM"
             },
@@ -119,9 +119,9 @@
               "iterations_per_process": 50,
               "iterations": 150,
               "time_ms": {
-                "median": 4.7394,
-                "min": 4.392939,
-                "max": 5.424233
+                "median": 4.616719,
+                "min": 4.562302,
+                "max": 4.940259
               }
             },
             "memory": {
@@ -129,9 +129,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 19.91796875,
-                "min": 19.8984375,
-                "max": 20.03515625
+                "median": 19.953125,
+                "min": 19.90234375,
+                "max": 20.0
               },
               "rss_source": "VmHWM"
             },
@@ -148,9 +148,9 @@
               "iterations_per_process": 10,
               "iterations": 30,
               "time_ms": {
-                "median": 58.9479805,
-                "min": 56.183696,
-                "max": 76.202459
+                "median": 57.262296,
+                "min": 56.314977,
+                "max": 68.444149
               }
             },
             "memory": {
@@ -158,9 +158,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 21.12890625,
-                "min": 21.08203125,
-                "max": 21.22265625
+                "median": 21.21875,
+                "min": 21.125,
+                "max": 21.25
               },
               "rss_source": "VmHWM"
             },
@@ -175,9 +175,9 @@
               "iterations_per_process": 5,
               "iterations": 15,
               "time_ms": {
-                "median": 1451.162309,
-                "min": 1345.70373,
-                "max": 1515.896636
+                "median": 1321.573038,
+                "min": 1283.777064,
+                "max": 1365.718157
               }
             },
             "memory": {
@@ -186,8 +186,8 @@
               "warmup_per_process": 0,
               "peak_rss_mib": {
                 "median": 101.7421875,
-                "min": 101.71484375,
-                "max": 101.84765625
+                "min": 101.7265625,
+                "max": 101.75390625
               },
               "rss_source": "VmHWM"
             },
@@ -202,14 +202,14 @@
       "startup": {
         "processes": 10,
         "wall_ms": {
-          "median": 33.60479100000191,
-          "min": 32.5786219999884,
-          "max": 40.41434999999183
+          "median": 27.412827499972536,
+          "min": 25.65213700000868,
+          "max": 28.558857000007265
         },
         "peak_rss_mib": {
-          "median": 50.966796875,
-          "min": 50.91796875,
-          "max": 50.9765625
+          "median": 49.609375,
+          "min": 49.5625,
+          "max": 49.6171875
         },
         "rss_source": "VmHWM"
       },
@@ -222,9 +222,9 @@
               "iterations_per_process": 30,
               "iterations": 90,
               "time_ms": {
-                "median": 7.150004,
-                "min": 5.602829,
-                "max": 12.264919
+                "median": 6.4238925,
+                "min": 5.376199,
+                "max": 11.70548
               }
             },
             "memory": {
@@ -232,9 +232,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 66.73828125,
-                "min": 66.359375,
-                "max": 67.0078125
+                "median": 64.19140625,
+                "min": 58.83984375,
+                "max": 64.7578125
               },
               "rss_source": "VmHWM"
             },
@@ -249,9 +249,9 @@
               "iterations_per_process": 50,
               "iterations": 150,
               "time_ms": {
-                "median": 0.8209230000000001,
-                "min": 0.462663,
-                "max": 2.641807
+                "median": 0.802808,
+                "min": 0.478237,
+                "max": 2.593018
               }
             },
             "memory": {
@@ -259,9 +259,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 68.3828125,
-                "min": 68.0234375,
-                "max": 69.0
+                "median": 66.6328125,
+                "min": 65.921875,
+                "max": 67.4140625
               },
               "rss_source": "VmHWM"
             },
@@ -278,9 +278,9 @@
               "iterations_per_process": 10,
               "iterations": 30,
               "time_ms": {
-                "median": 34.432477500000005,
-                "min": 29.093396,
-                "max": 45.79753
+                "median": 29.6334215,
+                "min": 26.542661,
+                "max": 44.933373
               }
             },
             "memory": {
@@ -288,9 +288,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 79.44140625,
-                "min": 78.93359375,
-                "max": 81.23046875
+                "median": 77.109375,
+                "min": 76.35546875,
+                "max": 77.14453125
               },
               "rss_source": "VmHWM"
             },
@@ -305,9 +305,9 @@
               "iterations_per_process": 5,
               "iterations": 15,
               "time_ms": {
-                "median": 266.858879,
-                "min": 241.554058,
-                "max": 306.4125
+                "median": 236.549903,
+                "min": 218.752692,
+                "max": 289.725829
               }
             },
             "memory": {
@@ -315,9 +315,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 255.62890625,
-                "min": 255.37890625,
-                "max": 256.2734375
+                "median": 254.55859375,
+                "min": 253.59765625,
+                "max": 254.83984375
               },
               "rss_source": "VmHWM"
             },
@@ -346,8 +346,8 @@
           "src/xyang.egg-info/ (generated packaging metadata, outside the counted root)"
         ],
         "files": 87,
-        "physical_lines": 20618,
-        "code_lines": 16175
+        "physical_lines": 20658,
+        "code_lines": 16200
       },
       "typescript": {
         "root": "ts/src",
@@ -356,17 +356,460 @@
           "*.d.ts"
         ],
         "files": 91,
-        "physical_lines": 19727,
-        "code_lines": 17648
+        "physical_lines": 19759,
+        "code_lines": 17671
       }
     }
   },
-  "reproduce": "python benchmarks/release_bench.py run --zig-binary zig/zig-out-benchmark/bin/xyang-zig --out benchmarks/results/latest.json && python benchmarks/release_bench.py update-readme benchmarks/results/latest.json",
+  "reproduce": "python benchmarks/release_bench.py run --zig-build ReleaseSafe --zig-cli zig/zig-out-benchmark/bin/xyang-zig --zig-binary zig/zig-out-benchmark/bin/xyang-zig --out benchmarks/results/latest.json && python benchmarks/release_bench.py update-readme benchmarks/results/latest.json",
   "binary_size": {
     "zig": {
       "file": "xyang-zig",
-      "bytes": 922264,
-      "sha256": "5fd3a8579ed67069214df13d6f594b9343c2f53642fa80a7edf2529e3e18bb51"
+      "bytes": 1555176,
+      "sha256": "ae41aca46e0c5db8d886541618752e365c80ccd80b61206dbf8c9dc284c85514"
+    }
+  },
+  "zig_cli": {
+    "samples": 5,
+    "binary_sha256": "ae41aca46e0c5db8d886541618752e365c80ccd80b61206dbf8c9dc284c85514",
+    "workloads": {
+      "small": {
+        "parse": {
+          "wall_ms": {
+            "median": 1.205259,
+            "min": 1.155709,
+            "max": 1.329138
+          },
+          "peak_rss_mib": {
+            "median": 2.68359375,
+            "min": 2.68359375,
+            "max": 2.80859375
+          }
+        },
+        "validate": {
+          "wall_ms": {
+            "median": 1.635914,
+            "min": 1.631775,
+            "max": 1.735148
+          },
+          "peak_rss_mib": {
+            "median": 3.05859375,
+            "min": 3.05859375,
+            "max": 3.05859375
+          }
+        }
+      },
+      "large": {
+        "parse": {
+          "wall_ms": {
+            "median": 7.715645,
+            "min": 7.708365,
+            "max": 7.9102879999999995
+          },
+          "peak_rss_mib": {
+            "median": 3.74609375,
+            "min": 3.74609375,
+            "max": 3.74609375
+          }
+        },
+        "validate": {
+          "wall_ms": {
+            "median": 162.456465,
+            "min": 160.693759,
+            "max": 166.081909
+          },
+          "peak_rss_mib": {
+            "median": 113.43359375,
+            "min": 113.43359375,
+            "max": 113.43359375
+          }
+        }
+      }
+    },
+    "startup": {
+      "wall_ms": {
+        "median": 0.332642,
+        "min": 0.256786,
+        "max": 0.53735
+      },
+      "peak_rss_mib": {
+        "median": 0.93359375,
+        "min": 0.93359375,
+        "max": 0.93359375
+      }
+    },
+    "build": "ReleaseSafe"
+  },
+  "previous_release": {
+    "schema_version": 2,
+    "generated_at": "2026-11-21T14:58:33+00:00",
+    "smoke": false,
+    "environment": {
+      "git": {
+        "commit": "a774b768207f33f69d9d42db26d4dabc76f5818c",
+        "describe": "v1.0.8",
+        "dirty": false,
+        "release_tag": "v1.0.8"
+      },
+      "versions": {
+        "python_package": "1.0.8",
+        "ts_package": "1.0.8"
+      },
+      "runtimes": {
+        "python": "CPython 3.12.16",
+        "node": "v24.22.3"
+      },
+      "machine": {
+        "runner": "GitHub Actions ubuntu24 image 20261116.376.1 (X64)",
+        "os": "Linux 7.0.0-1017-azure",
+        "arch": "x86_64",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cpu_count": 4,
+        "mem_total_gib": 15.6
+      }
+    },
+    "workloads": {
+      "small": {
+        "name": "small",
+        "title": "meta-model sample",
+        "parse_modules": [
+          "examples/meta-model.yang"
+        ],
+        "parse_size": {
+          "files": 1,
+          "lines": 835,
+          "bytes": 37755
+        },
+        "validate_module": "examples/meta-model.yang",
+        "instance": "benchmarks/workloads/meta-model-sample.json",
+        "instance_note": "checked-in copy of tests/data/new_meta_model_sample.yaml as JSON",
+        "instance_bytes": 4884,
+        "instance_sha256": "586105d12e45cba5319b9d6020b5ca1148538e9490898d6285a8231ac6b9cd66",
+        "list_entries": null
+      },
+      "large": {
+        "name": "large",
+        "title": "IETF modules + 10k-interface inventory",
+        "parse_modules": [
+          "examples/ietf/ietf-alarms@2019-09-11.yang",
+          "examples/ietf-yang-push/modules/ietf-subscribed-notifications@2019-09-09.yang",
+          "examples/ietf-yang-push/modules/ietf-interfaces@2018-02-20.yang",
+          "examples/meta-model.yang"
+        ],
+        "parse_size": {
+          "files": 4,
+          "lines": 4696,
+          "bytes": 176085
+        },
+        "validate_module": "benchmarks/workloads/interface-inventory.yang",
+        "instance": "interface-inventory-10k.json",
+        "instance_note": "synthetic, generated by benchmarks/workloads.py: 10000 interfaces, 16 LAGs, pinned SHA-256",
+        "instance_bytes": 2097811,
+        "instance_sha256": "bfd8473371c798702ca9e586e439fb3fefcfc73ec3255784142e837ab88913a1",
+        "list_entries": 10016
+      }
+    },
+    "results": {
+      "python": {
+        "startup": {
+          "processes": 10,
+          "wall_ms": {
+            "median": 134.7445584999889,
+            "min": 131.704845999991,
+            "max": 237.77799200001937
+          },
+          "peak_rss_mib": {
+            "median": 18.12890625,
+            "min": 18.09375,
+            "max": 22.1015625
+          },
+          "rss_source": "VmHWM"
+        },
+        "workloads": {
+          "small": {
+            "parse": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 5,
+                "iterations_per_process": 30,
+                "iterations": 90,
+                "time_ms": {
+                  "median": 10.749823,
+                  "min": 9.838667,
+                  "max": 19.714139
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 19.85546875,
+                  "min": 19.73046875,
+                  "max": 19.88671875
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "modules": 1
+              }
+            },
+            "validate": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 10,
+                "iterations_per_process": 50,
+                "iterations": 150,
+                "time_ms": {
+                  "median": 4.7394,
+                  "min": 4.392939,
+                  "max": 5.424233
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 19.91796875,
+                  "min": 19.8984375,
+                  "max": 20.03515625
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "valid": true
+              }
+            }
+          },
+          "large": {
+            "parse": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 2,
+                "iterations_per_process": 10,
+                "iterations": 30,
+                "time_ms": {
+                  "median": 58.9479805,
+                  "min": 56.183696,
+                  "max": 76.202459
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 21.12890625,
+                  "min": 21.08203125,
+                  "max": 21.22265625
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "modules": 4
+              }
+            },
+            "validate": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 1,
+                "iterations_per_process": 5,
+                "iterations": 15,
+                "time_ms": {
+                  "median": 1451.162309,
+                  "min": 1345.70373,
+                  "max": 1515.896636
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 101.7421875,
+                  "min": 101.71484375,
+                  "max": 101.84765625
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "valid": true
+              }
+            }
+          }
+        }
+      },
+      "typescript": {
+        "startup": {
+          "processes": 10,
+          "wall_ms": {
+            "median": 33.60479100000191,
+            "min": 32.5786219999884,
+            "max": 40.41434999999183
+          },
+          "peak_rss_mib": {
+            "median": 50.966796875,
+            "min": 50.91796875,
+            "max": 50.9765625
+          },
+          "rss_source": "VmHWM"
+        },
+        "workloads": {
+          "small": {
+            "parse": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 5,
+                "iterations_per_process": 30,
+                "iterations": 90,
+                "time_ms": {
+                  "median": 7.150004,
+                  "min": 5.602829,
+                  "max": 12.264919
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 66.73828125,
+                  "min": 66.359375,
+                  "max": 67.0078125
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "modules": 1
+              }
+            },
+            "validate": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 10,
+                "iterations_per_process": 50,
+                "iterations": 150,
+                "time_ms": {
+                  "median": 0.8209230000000001,
+                  "min": 0.462663,
+                  "max": 2.641807
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 68.3828125,
+                  "min": 68.0234375,
+                  "max": 69.0
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "valid": true
+              }
+            }
+          },
+          "large": {
+            "parse": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 2,
+                "iterations_per_process": 10,
+                "iterations": 30,
+                "time_ms": {
+                  "median": 34.432477500000005,
+                  "min": 29.093396,
+                  "max": 45.79753
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 79.44140625,
+                  "min": 78.93359375,
+                  "max": 81.23046875
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "modules": 4
+              }
+            },
+            "validate": {
+              "timing": {
+                "processes": 3,
+                "warmup_per_process": 1,
+                "iterations_per_process": 5,
+                "iterations": 15,
+                "time_ms": {
+                  "median": 266.858879,
+                  "min": 241.554058,
+                  "max": 306.4125
+                }
+              },
+              "memory": {
+                "processes": 5,
+                "operations_per_process": 1,
+                "warmup_per_process": 0,
+                "peak_rss_mib": {
+                  "median": 255.62890625,
+                  "min": 255.37890625,
+                  "max": 256.2734375
+                },
+                "rss_source": "VmHWM"
+              },
+              "check": {
+                "valid": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "code_size": {
+      "method": "benchmarks/loc.py: nonblank lines touched by a code token; comment-only lines and Python docstrings excluded (Python: tokenize/ast; TypeScript: built-in lexer)",
+      "excluded": [
+        "tests/, ts/test/ (tests)",
+        "tests/cases/, examples/, benchmarks/ (fixtures and workloads)",
+        "ts/dist/, artifacts/, docs/*.js (generated bundles)",
+        "ts/node_modules/ (dependencies)",
+        "ts/bench/, ts/scripts/ (tooling)"
+      ],
+      "languages": {
+        "python": {
+          "root": "src/xyang",
+          "pattern": "**/*.py",
+          "excludes": [
+            "src/xyang.egg-info/ (generated packaging metadata, outside the counted root)"
+          ],
+          "files": 87,
+          "physical_lines": 20618,
+          "code_lines": 16175
+        },
+        "typescript": {
+          "root": "ts/src",
+          "pattern": "**/*.ts",
+          "excludes": [
+            "*.d.ts"
+          ],
+          "files": 91,
+          "physical_lines": 19727,
+          "code_lines": 17648
+        }
+      }
+    },
+    "reproduce": "python benchmarks/release_bench.py run --zig-binary zig/zig-out-benchmark/bin/xyang-zig --out benchmarks/results/latest.json && python benchmarks/release_bench.py update-readme benchmarks/results/latest.json",
+    "binary_size": {
+      "zig": {
+        "file": "xyang-zig",
+        "bytes": 922264,
+        "sha256": "5fd3a8579ed67069214df13d6f594b9343c2f53642fa80a7edf2529e3e18bb51"
+      }
     }
   }
 }
