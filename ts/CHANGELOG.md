@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.9] — 2026-11-21
+
 ### Added
 
 - Plain JSON Schema export: `generateJsonSchema(module, { xYang: false })` and `xyang-ts convert --no-x-yang` omit the `x-yang` and `x-fraction-digits` extension keywords, also for a subtree `path`. Data names in `properties`, `patternProperties`, `$defs` and `dependentSchemas` stay, even when a YANG node is named `x-…`. The result is for other JSON Schema tools; `parseJsonSchema` cannot read it back.
@@ -340,7 +342,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/exergy-connect/xYang/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/exergy-connect/xYang/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/exergy-connect/xYang/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/exergy-connect/xYang/compare/v1.0.5...v1.0.6

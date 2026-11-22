@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.9] — 2026-11-21
+
 ### Added
 
 - Plain JSON Schema export: `generate_json_schema(..., x_yang=False)` / `generateJsonSchema(module, { xYang: false })` and `convert --no-x-yang` omit the `x-yang` and `x-fraction-digits` extension keywords, also for a subtree `path`. Data names in `properties`, `patternProperties`, `$defs` and `dependentSchemas` stay, even when a YANG node is named `x-…`. The result is for other JSON Schema tools; it cannot be read back with `parse_json_schema` / `parseJsonSchema`.
@@ -565,7 +567,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
 - ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/exergy-connect/xYang/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/exergy-connect/xYang/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/exergy-connect/xYang/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/exergy-connect/xYang/compare/v1.0.5...v1.0.6
