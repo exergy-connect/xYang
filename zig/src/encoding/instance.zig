@@ -121,8 +121,20 @@ pub const Walk = struct {
     root_canonical: ?*jv.Object = null,
     skip_projection: bool = false,
     prepared: bool = false,
+    dotted: ?bool = null,
 
-    const Transform = struct { value: Val, message: ?[]const u8 = null };
+    const Transform = struct {
+        value: Val,
+        message: ?[]const u8 = null,
+
+        /// The issue when this result of normalizing `raw` failed or changed it.
+        fn problem(result: Transform, raw: Val) ?Problem {
+            if (result.message) |message| return .{ .code = "normalize", .message = message };
+            const same_object = result.value == .object and raw == .object and result.value.object == raw.object;
+            if (!same_object and !jv.pyEql(result.value, raw)) return .{ .code = "canonical", .message = normalize_changes };
+            return null;
+        }
+    };
 
     fn isTransform(stmt: *const Statement, name: []const u8) bool {
         if (stmt.kind() != .extension_invocation) return false;
@@ -841,6 +853,14 @@ pub const Walk = struct {
     /// `canonical_errors`: where native `data` is not already canonical; empty when it can be
     /// validated as written.
     pub fn canonicalErrors(self: *Walk, data: *const jv.Object, schema: ?*const Statement, at_root: bool) Error![]const EncodingIssue {
+        var out: std.ArrayList(EncodingIssue) = .empty;
+        if (try self.canonicalRoot(data, schema, at_root, &out)) try self.checkObject(data, schema, "", &out);
+        return out.items;
+    }
+
+    /// The check before any member of the root: false (and reported) when a module-level
+    /// normalize rule fails or changes `data`.
+    pub fn canonicalRoot(self: *Walk, data: *const jv.Object, schema: ?*const Statement, at_root: bool, out: *std.ArrayList(EncodingIssue)) Error!bool {
         if (!self.prepared) {
             self.prepared = true;
             try self.prepareStatements(self.module.statements.items, true);
@@ -848,105 +868,158 @@ pub const Walk = struct {
         self.root_input = data;
         self.root_schema = schema;
         self.root_at_root = at_root;
-        var out: std.ArrayList(EncodingIssue) = .empty;
         const raw: Val = .{ .object = @constCast(data) };
         const statements = if (schema) |s| s.statements.items else self.module.statements.items;
-        if (try self.unchanged(try self.transformStatements(raw, statements), raw, "", &out))
-            try self.checkObject(data, schema, "", at_root, &out);
-        return out.items;
+        const problem = (try self.transformStatements(raw, statements)).problem(raw) orelse return true;
+        try self.issue(out, "", problem.code, problem.message);
+        return false;
     }
+
+    /// A canonical object still to be checked: a container value or a list entry.
+    pub const Descend = struct {
+        stmt: *const Statement,
+        obj: *const jv.Object,
+        key: []const u8,
+        index: ?usize,
+
+        /// The pointer of `obj`, given the pointer of the object that holds `key`.
+        pub fn pointer(self: Descend, a: Allocator, prefix: []const u8) error{OutOfMemory}![]const u8 {
+            const member = try join(a, prefix, self.key);
+            return if (self.index) |i| a.print("{s}/{d}", .{ member, i }) else member;
+        }
+    };
 
     fn issue(self: *Walk, out: *std.ArrayList(EncodingIssue), pointer: []const u8, code: []const u8, message: []const u8) error{OutOfMemory}!void {
         try out.append(self.a, .{ .pointer = pointer, .code = code, .message = message });
     }
 
-    /// `normalized`: false (and reported) when a normalize rule fails or changes `raw`.
-    fn unchanged(self: *Walk, result: Transform, raw: Val, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) error{OutOfMemory}!bool {
-        if (result.message) |message| {
-            try self.issue(out, pointer, "normalize", message);
-            return false;
-        }
-        const same_object = result.value == .object and raw == .object and result.value.object == raw.object;
-        if (!same_object and !jv.pyEql(result.value, raw)) {
-            try self.issue(out, pointer, "canonical", "an xt:normalize rule changes this value; it is applied only without canonical");
-            return false;
-        }
-        return true;
+    const Problem = struct { code: []const u8, message: []const u8 };
+
+    const normalize_changes = "an xt:normalize rule changes this value; it is applied only without canonical";
+
+    fn dottedCached(self: *Walk) bool {
+        if (self.dotted == null) self.dotted = self.dottedEnabled();
+        return self.dotted.?;
     }
 
-    fn checkObject(self: *Walk, data: *const jv.Object, schema: ?*const Statement, prefix: []const u8, at_root: bool, out: *std.ArrayList(EncodingIssue)) Error!void {
-        const expand = self.dottedEnabled();
+    const PointerText = struct {
+        pointer: []const u8,
+        pub fn text(self: PointerText) error{OutOfMemory}![]const u8 {
+            return self.pointer;
+        }
+    };
+
+    /// The members of canonical `data` and their descendants, `data` at `prefix`.
+    pub fn checkObject(self: *Walk, data: *const jv.Object, schema: ?*const Statement, prefix: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
+        var descend: std.ArrayList(Descend) = .empty;
         var it = data.iterator();
-        while (it.next()) |e| {
-            const key = e.key_ptr.*;
-            const here = try join(self.a, prefix, key);
-            if (expand and std.mem.findScalar(u8, key, '.') != null) {
-                try self.issue(out, here, "canonical", try self.a.print("dotted key {f} is expanded only without canonical", .{pyfmt.repr(key)}));
-                continue;
-            }
-            // Native resolution first, so a member accepted here resolves exactly as without canonical.
-            const hits = try self.resolve(key, schema, at_root);
-            if (hits.len == 0) continue;
-            if (hits.len > 1) {
-                try self.issue(out, here, "ambiguous-name", try self.a.print("member name '{s}' matches more than one node", .{key}));
-                continue;
-            }
-            const stmt = hits[0];
-            const spelled = (try self.keys.key(stmt)) orelse stmt.name;
-            if (!std.mem.eql(u8, key, spelled)) {
-                try self.issue(out, here, "canonical", try self.a.print("member {f} is spelled {f} in a canonical instance", .{ pyfmt.repr(key), pyfmt.repr(spelled) }));
-                continue;
-            }
-            try self.checkNode(e.value_ptr.*, stmt, here, out);
-        }
+        const at: PointerText = .{ .pointer = prefix };
+        while (it.next()) |e| try self.checkMember(e.key_ptr.*, e.value_ptr.*, schema, at, out, &descend);
+        for (descend.items) |d| try self.checkChildren(d.stmt, d.obj, try d.pointer(self.a, prefix), out);
     }
 
-    fn checkNode(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
+    /// One member of a canonical object, without its descendants: issues go to `out`, and
+    /// the objects below it that still need checking go to `descend`. `prefix.text()` is
+    /// the object's pointer, asked for only when there is an issue.
+    pub fn checkMember(self: *Walk, key: []const u8, raw: Val, schema: ?*const Statement, prefix: anytype, out: *std.ArrayList(EncodingIssue), descend: *std.ArrayList(Descend)) Error!void {
+        if (self.dottedCached() and std.mem.findScalar(u8, key, '.') != null) {
+            return self.issue(out, try join(self.a, try prefix.text(), key), "canonical", try self.a.print("dotted key {f} is expanded only without canonical", .{pyfmt.repr(key)}));
+        }
+        // Native resolution first, so a member accepted here resolves exactly as without canonical.
+        const stmt = switch (try self.resolveNative(key, schema)) {
+            .none => return,
+            .many => return self.issue(out, try join(self.a, try prefix.text(), key), "ambiguous-name", try self.a.print("member name '{s}' matches more than one node", .{key})),
+            .one => |found| found,
+        };
+        const spelled = (try self.keys.key(stmt)) orelse stmt.name;
+        if (!std.mem.eql(u8, key, spelled)) {
+            return self.issue(out, try join(self.a, try prefix.text(), key), "canonical", try self.a.print("member {f} is spelled {f} in a canonical instance", .{ pyfmt.repr(key), pyfmt.repr(spelled) }));
+        }
         if (stmt.kind() == .list or stmt.kind() == .leaf_list) {
-            if (raw == .null and hasNormalize(stmt)) {
-                try self.issue(out, pointer, "canonical", "an xt:normalize rule changes this value; it is applied only without canonical");
-                return;
-            }
-        } else if (!try self.unchanged(try self.transform(raw, stmt), raw, pointer, out)) return;
+            if (raw == .null and hasNormalize(stmt)) return self.issue(out, try join(self.a, try prefix.text(), key), "canonical", normalize_changes);
+        } else if (try self.transformProblem(raw, stmt)) |p| return self.issue(out, try join(self.a, try prefix.text(), key), p.code, p.message);
         switch (stmt.kind()) {
-            .leaf => try self.leafIssues(raw, stmt, pointer, out),
+            .leaf => if (try self.leafProblem(raw, stmt)) |message| try self.issue(out, try join(self.a, try prefix.text(), key), "type", message),
             .list => {
-                if (raw == .object) return self.issue(out, pointer, "canonical", "a list is a JSON array in a canonical instance");
-                if (raw != .array) return self.issue(out, pointer, "type", "list must be an array");
+                if (raw == .object) return self.issue(out, try join(self.a, try prefix.text(), key), "canonical", "a list is a JSON array in a canonical instance");
+                if (raw != .array) return self.issue(out, try join(self.a, try prefix.text(), key), "type", "list must be an array");
                 for (raw.array, 0..) |item, i| {
-                    const here = try self.a.print("{s}/{d}", .{ pointer, i });
-                    if (!try self.unchanged(try self.transform(item, stmt), item, here, out)) continue;
-                    if (item != .object) {
-                        try self.issue(out, here, "type", "list item must be an object");
-                        continue;
+                    const here: Descend = .{ .stmt = stmt, .obj = undefined, .key = key, .index = i };
+                    if (try self.transformProblem(item, stmt)) |p| {
+                        try self.issue(out, try here.pointer(self.a, try prefix.text()), p.code, p.message);
+                    } else if (item != .object) {
+                        try self.issue(out, try here.pointer(self.a, try prefix.text()), "type", "list item must be an object");
+                    } else {
+                        var entry = here;
+                        entry.obj = item.object;
+                        try descend.append(self.a, entry);
                     }
-                    try self.checkChildren(stmt, item.object, here, out);
                 }
             },
             .leaf_list => {
-                if (raw != .array) return self.issue(out, pointer, "type", "leaf-list must be an array");
+                if (raw != .array) return self.issue(out, try join(self.a, try prefix.text(), key), "type", "leaf-list must be an array");
                 for (raw.array, 0..) |item, i| {
-                    const here = try self.a.print("{s}/{d}", .{ pointer, i });
-                    if (try self.unchanged(try self.transform(item, stmt), item, here, out)) try self.leafIssues(item, stmt, here, out);
+                    const here: Descend = .{ .stmt = stmt, .obj = undefined, .key = key, .index = i };
+                    if (try self.transformProblem(item, stmt)) |p| {
+                        try self.issue(out, try here.pointer(self.a, try prefix.text()), p.code, p.message);
+                    } else if (try self.leafProblem(item, stmt)) |message| {
+                        try self.issue(out, try here.pointer(self.a, try prefix.text()), "type", message);
+                    }
                 }
             },
             else => if (isContainerKind(stmt)) {
-                if (raw != .object) return self.issue(out, pointer, "type", "container must be an object");
-                try self.checkChildren(stmt, raw.object, pointer, out);
+                if (raw != .object) return self.issue(out, try join(self.a, try prefix.text(), key), "type", "container must be an object");
+                try descend.append(self.a, .{ .stmt = stmt, .obj = raw.object, .key = key, .index = null });
             },
         }
     }
 
-    fn leafIssues(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
-        const node = try self.walkLeaf(raw, stmt, pointer);
-        for (node.errors.items) |e| try self.issue(out, pointer, e.code, e.message);
+    /// The issue when a normalize rule of `stmt` fails on or changes `raw`.
+    fn transformProblem(self: *Walk, raw: Val, stmt: *const Statement) error{OutOfMemory}!?Problem {
+        if (!hasNormalize(stmt)) return null;
+        return (try self.transform(raw, stmt)).problem(raw);
     }
 
-    fn checkChildren(self: *Walk, stmt: *const Statement, data: *const jv.Object, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
+    /// `resolve` in native mode (`at_root` does not matter there), without allocating the matches.
+    const Resolved = union(enum) { none, one: *const Statement, many };
+
+    fn resolveNative(self: *Walk, key: []const u8, schema: ?*const Statement) Error!Resolved {
+        std.debug.assert(self.native);
+        const children = try self.dataNodes(schema);
+        var found: ?*const Statement = null;
+        if (std.mem.findScalar(u8, key, ':')) |colon| {
+            const mod = key[0..colon];
+            const local = key[colon + 1 ..];
+            if (mod.len == 0 or local.len == 0) return .none;
+            for (children) |c| {
+                if (!std.mem.eql(u8, c.name, local) or !std.mem.eql(u8, rfc7951.definingModuleName(c, self.keys.parent_module), mod)) continue;
+                if (found != null) return .many;
+                found = c;
+            }
+        } else for (children) |c| {
+            if (!std.mem.eql(u8, c.name, key)) continue;
+            if (found != null) return .many;
+            found = c;
+        }
+        return if (found) |c| .{ .one = c } else .none;
+    }
+
+    /// The message when `raw` is not the encoding of the leaf's type.
+    fn leafProblem(self: *Walk, raw: Val, stmt: *const Statement) Error!?[]const u8 {
+        const t = leafType(stmt) orelse return null;
+        const eff = self.unwrap(t);
+        if (!isEncoded(eff.name) or (try self.decode(raw, t)) != null) return null;
+        if (std.mem.eql(u8, eff.name, registry.EMPTY))
+            return if (self.native) "empty is null in native mode; RFC 7951 encodes empty as [null]" else "empty is [null] in RFC 7951; pass --native-json for null";
+        return try self.hint(eff.name);
+    }
+
+    /// The members of canonical `data` below `stmt`, named relative to its module.
+    pub fn checkChildren(self: *Walk, stmt: *const Statement, data: *const jv.Object, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
         const saved = self.keys.parent_module;
         self.keys.parent_module = rfc7951.definingModuleName(stmt, saved);
         defer self.keys.parent_module = saved;
-        return self.checkObject(data, stmt, pointer, false, out);
+        return self.checkObject(data, stmt, pointer, out);
     }
 };
 

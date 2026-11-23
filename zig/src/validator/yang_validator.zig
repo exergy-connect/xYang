@@ -48,6 +48,10 @@ pub const Options = struct {
     /// With `native_json`: the data claims to be canonical. It is checked and validated as
     /// written, without a projection; a failed check returns only its errors.
     canonical: bool = false,
+    /// Caller promises canonical native JSON, including canonical names, list arrays,
+    /// scalar representations, and values unchanged by normalization. Debug builds
+    /// verify the promise and panic on the first violation.
+    canonical_trusted: bool = false,
     /// Caller promises that all instance strings and schema defaults checked as strings
     /// contain only ASCII. Debug builds assert the promise; a false promise is invalid.
     assume_ascii: bool = false,
@@ -92,8 +96,8 @@ pub const YangValidator = struct {
 
     fn collect(self: *YangValidator, u: *operation.Usage, data: Val, options: Options) Error![]const ValidationError {
         try operation.checkOptions(u, options.rpc, options.action, options.direction, options.context);
-        if (options.canonical and !options.native_json) return u.fail("canonical applies only to native JSON (native_json=True)", .{});
-        if (options.canonical and (options.rpc != null or options.action != null)) return u.fail("canonical does not apply to rpc or action instances", .{});
+        if ((options.canonical or options.canonical_trusted) and !options.native_json) return u.fail("canonical applies only to native JSON (native_json=True)", .{});
+        if ((options.canonical or options.canonical_trusted) and (options.rpc != null or options.action != null)) return u.fail("canonical does not apply to rpc or action instances", .{});
         if (options.rpc != null or options.action != null) return self.collectOperation(u, data, options);
         var checker: type_checker.TypeChecker = .{ .a = self.a, .root = self.module, .assume_ascii = options.assume_ascii };
         defer checker.deinit();
@@ -123,13 +127,28 @@ pub const YangValidator = struct {
         var out: std.ArrayList(ValidationError) = .empty;
         var canonical = instance_data;
         var map: instance.PointerMap = .empty;
-        if (options.canonical and instance_data == .object) {
+        if (options.canonical_trusted) {
+            // A false proclamation is a caller bug: Debug builds stop on it, never fall back.
+            if (builtin.mode == .debug) if (try self.trustedViolation(instance_data, structure, &keys, &checker)) |v|
+                std.debug.panic("canonical_trusted violation at '{s}' ({s}): {s}", .{ v.pointer, v.code, v.message });
+        } else if (options.canonical and instance_data == .object) {
+            // One walk: the document validator runs the canonical check as it goes, and a
+            // failed check returns only its errors.
             var walk: instance.Walk = .{ .a = self.a, .module = self.module, .native = true, .keys = &keys, .checker = &checker };
-            const issues = try walk.canonicalErrors(instance_data.object, structure, true);
-            if (issues.len > 0) {
-                for (issues) |i| try out.append(self.a, .{ .path = if (i.pointer.len > 0) i.pointer else "/", .pointer = i.pointer, .code = i.code, .message = i.message });
-                return self.prefixStructure(structure, structure_key, out.items);
+            var check: document_validator.Canonical = .{ .walk = &walk, .root = instance_data.object, .root_schema = structure };
+            if (try walk.canonicalRoot(instance_data.object, structure, true, &check.issues)) {
+                dv.canonical = &check;
+                const found = if (structure) |s| try dv.validateStructure(instance_data, s) else try dv.validate(instance_data);
+                // The validator enters the root unless it stops first; then check it here.
+                if (check.root) |root| try walk.checkObject(root, structure, "", &check.issues);
+                if (builtin.mode == .debug) try self.assertCanonicalParity(instance_data.object, structure, &keys, &checker, check.issues.items);
+                if (check.issues.items.len == 0) {
+                    try out.appendSlice(self.a, found);
+                    return self.prefixStructure(structure, structure_key, out.items);
+                }
             }
+            for (check.issues.items) |i| try out.append(self.a, .{ .path = if (i.pointer.len > 0) i.pointer else "/", .pointer = i.pointer, .code = i.code, .message = i.message });
+            return self.prefixStructure(structure, structure_key, out.items);
         } else {
             var walk: instance.Walk = .{ .a = self.a, .module = self.module, .native = options.native_json, .keys = &keys, .checker = &checker };
             const nodes = try walk.iterDocument(instance_data, structure, true);
@@ -143,10 +162,40 @@ pub const YangValidator = struct {
         const found = if (structure) |s| try dv.validateStructure(canonical, s) else try dv.validate(canonical);
         for (found) |e| {
             var err = e;
-            err.pointer = try instance.remapPointer(self.a, e.pointer, &map);
+            if (!options.canonical_trusted) err.pointer = try instance.remapPointer(self.a, e.pointer, &map);
             try out.append(self.a, err);
         }
         return self.prefixStructure(structure, structure_key, out.items);
+    }
+
+    /// The first way `data` breaks the `canonical_trusted` proclamation, or null when it holds.
+    fn trustedViolation(self: *YangValidator, data: Val, structure: ?*Statement, keys: *rfc7951.MemberKeys, checker: *type_checker.TypeChecker) Error!?instance.EncodingIssue {
+        if (data != .object) return .{ .pointer = "", .code = "canonical", .message = "a canonical instance is a JSON object" };
+        var walk: instance.Walk = .{ .a = self.a, .module = self.module, .native = true, .keys = keys, .checker = checker };
+        const issues = try walk.canonicalErrors(data.object, structure, true);
+        return if (issues.len > 0) issues[0] else null;
+    }
+
+    /// Debug: the canonical check run during validation reports what the separate walk
+    /// reports, in any order.
+    fn assertCanonicalParity(self: *YangValidator, data: *const jv.Object, structure: ?*Statement, keys: *rfc7951.MemberKeys, checker: *type_checker.TypeChecker, fused: []const instance.EncodingIssue) Error!void {
+        var walk: instance.Walk = .{ .a = self.a, .module = self.module, .native = true, .keys = keys, .checker = checker };
+        const separate = try walk.canonicalErrors(data, structure, true);
+        const lines = struct {
+            fn of(a: Allocator, issues: []const instance.EncodingIssue) error{OutOfMemory}![]const u8 {
+                const out = try a.alloc([]const u8, issues.len);
+                for (issues, out) |i, *line| line.* = try a.print("{s} {s} {s}", .{ i.pointer, i.code, i.message });
+                std.mem.sort([]const u8, out, {}, struct {
+                    fn lt(_: void, x: []const u8, y: []const u8) bool {
+                        return std.mem.order(u8, x, y) == .lt;
+                    }
+                }.lt);
+                return std.mem.join(a, "\n", out);
+            }
+        };
+        const want = try lines.of(self.a, separate);
+        const got = try lines.of(self.a, fused);
+        if (!std.mem.eql(u8, want, got)) std.debug.panic("fused canonical check differs\nseparate:\n{s}\nfused:\n{s}", .{ want, got });
     }
 
     fn prefixStructure(self: *YangValidator, structure: ?*Statement, structure_key: []const u8, errors: []ValidationError) error{OutOfMemory}![]const ValidationError {
@@ -339,4 +388,147 @@ test "ASCII proclamation preserves validation results" {
     const claimed = try validator.validate(invalid, .{ .assume_ascii = true });
     try std.testing.expectEqual(normal.errors.len, claimed.errors.len);
     try std.testing.expectEqual(@as(usize, 2), claimed.errors.len);
+}
+
+test "trusted canonical native input preserves validation results" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a, "module m { namespace 'urn:m'; prefix m; leaf x { type string { length '2..4'; } } }", "test.yang", &diag);
+    var message: []const u8 = "";
+    const data = try jv.parse(a, "{\"x\":\"a\"}", &message);
+    var validator = YangValidator.init(a, module);
+    const checked = try validator.validate(data, .{ .native_json = true, .canonical = true });
+    const trusted = try validator.validate(data, .{ .native_json = true, .canonical_trusted = true });
+    try std.testing.expectEqual(@as(usize, 1), checked.errors.len);
+    try std.testing.expectEqualStrings(checked.errors[0].code, trusted.errors[0].code);
+    try std.testing.expectEqualStrings(checked.errors[0].pointer, trusted.errors[0].pointer);
+}
+
+test "canonical native keyed list is rejected before document errors" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a, "module m { namespace 'urn:m'; prefix m; list item { key 'id'; leaf id { type string; } } leaf required { type string; mandatory true; } }", "test.yang", &diag);
+    var message: []const u8 = "";
+    const data = try jv.parse(a, "{\"item\":{\"a\":{\"id\":\"a\"}}}", &message);
+    var validator = YangValidator.init(a, module);
+    const result = try validator.validate(data, .{ .native_json = true, .canonical = true });
+    try std.testing.expectEqual(@as(usize, 1), result.errors.len);
+    try std.testing.expectEqualStrings("canonical", result.errors[0].code);
+    try std.testing.expectEqualStrings("/item", result.errors[0].pointer);
+}
+
+test "canonical native wrong module prefix is rejected" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a, "module m { namespace 'urn:m'; prefix m; leaf x { type string; } }", "test.yang", &diag);
+    var message: []const u8 = "";
+    const data = try jv.parse(a, "{\"other:x\":\"a\"}", &message);
+    var validator = YangValidator.init(a, module);
+    const result = try validator.validate(data, .{ .native_json = true, .canonical = true });
+    try std.testing.expectEqual(@as(usize, 1), result.errors.len);
+    try std.testing.expectEqualStrings("unknown-field", result.errors[0].code);
+}
+
+test "canonical native dotted key is rejected" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const dir = "../tests/cases/normalization/dotted";
+    var loader = @import("../parser/yang_parser.zig").Loader.init(a, std.testing.io, &diag, &.{dir});
+    const module = try loader.parseFile(dir ++ "/m.yang");
+    var message: []const u8 = "";
+    const data = try jv.parse(a, "{\"defaults.bgp.as\":65000}", &message);
+    var validator = YangValidator.init(a, module);
+    const result = try validator.validate(data, .{ .native_json = true, .canonical = true });
+    try std.testing.expectEqual(@as(usize, 1), result.errors.len);
+    try std.testing.expectEqualStrings("canonical", result.errors[0].code);
+    try std.testing.expectEqualStrings("/defaults.bgp.as", result.errors[0].pointer);
+}
+
+test "trusted canonical proclamation detects non-canonical input" {
+    // Debug builds panic with this violation; the check itself is tested here.
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a, "module m { namespace 'urn:m'; prefix m; list item { key 'id'; leaf id { type string; } } }", "test.yang", &diag);
+    var message: []const u8 = "";
+    var validator = YangValidator.init(a, module);
+    var checker: type_checker.TypeChecker = .{ .a = a, .root = module };
+    defer checker.deinit();
+    var keys: rfc7951.MemberKeys = .{ .a = a, .parent_module = module.name };
+    const keyed = try jv.parse(a, "{\"item\":{\"a\":{\"id\":\"a\"}}}", &message);
+    const violation = (try validator.trustedViolation(keyed, null, &keys, &checker)) orelse return error.TestExpectedViolation;
+    try std.testing.expectEqualStrings("canonical", violation.code);
+    try std.testing.expectEqualStrings("/item", violation.pointer);
+    try std.testing.expect((try validator.trustedViolation(.null, null, &keys, &checker)) != null);
+    const canonical = try jv.parse(a, "{\"item\":[{\"id\":\"a\"}]}", &message);
+    try std.testing.expect((try validator.trustedViolation(canonical, null, &keys, &checker)) == null);
+}
+
+fn canonicalErrorsFor(a: Allocator, yang: []const u8, json: []const u8) ![]const ValidationError {
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a, yang, "test.yang", &diag);
+    var message: []const u8 = "";
+    const data = try jv.parse(a, json, &message);
+    var validator = YangValidator.init(a, module);
+    return (try validator.validate(data, .{ .native_json = true, .canonical = true })).errors;
+}
+
+test "canonical check covers a subtree whose when is false" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const errors = try canonicalErrorsFor(arena.allocator(),
+        "module m { namespace 'urn:m'; prefix m; leaf on { type boolean; } container c { when '../on = \"true\"'; container inner { list item { key 'id'; leaf id { type string; } } } } }",
+        "{\"on\":false,\"c\":{\"inner\":{\"item\":{\"a\":{\"id\":\"a\"}}}}}");
+    try std.testing.expectEqual(@as(usize, 1), errors.len);
+    try std.testing.expectEqualStrings("canonical", errors[0].code);
+    try std.testing.expectEqualStrings("/c/inner/item", errors[0].pointer);
+}
+
+test "canonical check covers a container given as a non-object" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const errors = try canonicalErrorsFor(arena.allocator(),
+        "module m { namespace 'urn:m'; prefix m; container c { leaf x { type string; } } list l { key 'id'; leaf id { type string; } container d { leaf y { type int64; } } } }",
+        "{\"c\":1,\"l\":[{\"id\":\"a\",\"d\":{\"y\":\"7\"}},2]}");
+    try std.testing.expectEqual(@as(usize, 3), errors.len);
+    var codes: [3][]const u8 = undefined;
+    for (errors, &codes) |e, *c| c.* = try std.fmt.allocPrint(arena.allocator(), "{s} {s}", .{ e.pointer, e.code });
+    std.mem.sort([]const u8, &codes, {}, struct {
+        fn lt(_: void, x: []const u8, y: []const u8) bool {
+            return std.mem.order(u8, x, y) == .lt;
+        }
+    }.lt);
+    try std.testing.expectEqualStrings("/c type", codes[0]);
+    try std.testing.expectEqualStrings("/l/0/d/y type", codes[1]);
+    try std.testing.expectEqualStrings("/l/1 type", codes[2]);
+}
+
+test "canonical check covers members of a choice" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const errors = try canonicalErrorsFor(arena.allocator(),
+        "module m { namespace 'urn:m'; prefix m; container c { choice ch { case a { container ca { list item { key 'id'; leaf id { type string; } } } } case b { leaf cb { type string; } } } } }",
+        "{\"c\":{\"ca\":{\"item\":{\"k\":{\"id\":\"k\"}}},\"cb\":\"x\"}}");
+    try std.testing.expectEqual(@as(usize, 1), errors.len);
+    try std.testing.expectEqualStrings("/c/ca/item", errors[0].pointer);
+}
+
+test "valid canonical input returns the document errors" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const errors = try canonicalErrorsFor(arena.allocator(),
+        "module m { namespace 'urn:m'; prefix m; list l { key 'id'; leaf id { type string; } leaf n { type int64; mandatory true; } } }",
+        "{\"l\":[{\"id\":\"a\",\"n\":1},{\"id\":\"b\"}]}");
+    try std.testing.expectEqual(@as(usize, 1), errors.len);
+    try std.testing.expectEqualStrings("mandatory", errors[0].code);
+    try std.testing.expectEqualStrings("/l/1/n", errors[0].pointer);
 }
