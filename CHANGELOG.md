@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Zig caches leafref targets per validation, by path and by the node a relative path's leading `..` steps reach, for paths without predicates. Membership uses hash sets with the same matching as before (`1` matches `1.0`; `true` does not match `1`), and the path is formatted only for an error. On a 10,000-interface inventory with 1,000 LAGs, validation takes about 119 ms instead of 444 ms. Zig callers can proclaim with `Options.normalized_json_values` that each leafref value has its targets' JSON type; Debug builds check the proclamation and panic on a mismatch (#278).
+
+### Changed
+
 - Zig validates a `canonical` instance in one walk: the canonical check runs inside document validation instead of as a separate pass, and still returns only its errors when it fails. On a 10,000-interface canonical inventory, validation takes about 48 ms instead of 68 ms and allocates 15 MiB instead of 60 MiB. Zig callers can proclaim canonical native input with `Options.canonical_trusted`, which skips the canonical check, the projection and pointer remapping; Debug builds verify the proclamation and panic on the first violation (#277).
 
 ## [1.0.9] — 2026-11-21

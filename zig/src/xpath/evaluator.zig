@@ -1,8 +1,8 @@
 //! Stateless YANG XPath evaluator (mirrors `src/xyang/xpath/evaluator.py`).
 //!
 //! `ctx` is passed unchanged through one expression; `node` is replaced on every path
-//! step. Python's per-run path cache is not ported: it only memoizes absolute paths,
-//! whose results do not change during one validation.
+//! step. The evaluator keeps no cache; leafref targets are cached per validation by
+//! `validator/type_checker.zig`.
 
 const std = @import("std");
 const ast = @import("../ast.zig");
@@ -141,8 +141,13 @@ pub const Evaluator = struct {
 
     /// `eval_path`: the node-set a path selects.
     pub fn evalPath(self: *Evaluator, path: *const Path, ctx: Context, node: *const Node) Error![]const *const Node {
-        var nodes: []const *const Node = try self.a.dupe(*const Node, &.{if (path.is_absolute) ctx.root else node});
-        for (path.segments) |*seg| {
+        return self.evalSegments(path.segments, ctx, try self.a.dupe(*const Node, &.{if (path.is_absolute) ctx.root else node}));
+    }
+
+    /// The node-set `segments` select from `start`, as the tail of a path.
+    pub fn evalSegments(self: *Evaluator, segments: []const Segment, ctx: Context, start: []const *const Node) Error![]const *const Node {
+        var nodes = start;
+        for (segments) |*seg| {
             if (std.mem.eql(u8, seg.step, ".")) {
                 // unchanged
             } else if (std.mem.eql(u8, seg.step, "..")) {
