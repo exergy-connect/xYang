@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Zig checks a `canonical` instance without building throwaway decoded leaf nodes. Zig callers can proclaim canonical native input with `Options.canonical_trusted`, which skips the canonical check, the projection and pointer remapping; Debug builds verify the proclamation and panic on the first violation (#277).
+
 ## [1.0.9] — 2026-11-21
 
 ### Added

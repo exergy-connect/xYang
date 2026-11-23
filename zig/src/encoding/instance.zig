@@ -938,8 +938,15 @@ pub const Walk = struct {
     }
 
     fn leafIssues(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
-        const node = try self.walkLeaf(raw, stmt, pointer);
-        for (node.errors.items) |e| try self.issue(out, pointer, e.code, e.message);
+        const t = leafType(stmt) orelse return;
+        const eff = self.unwrap(t);
+        if ((try self.decode(raw, t)) == null and isEncoded(eff.name)) {
+            const message = if (std.mem.eql(u8, eff.name, registry.EMPTY))
+                (if (self.native) "empty is null in native mode; RFC 7951 encodes empty as [null]" else "empty is [null] in RFC 7951; pass --native-json for null")
+            else
+                try self.hint(eff.name);
+            try self.issue(out, pointer, "type", message);
+        }
     }
 
     fn checkChildren(self: *Walk, stmt: *const Statement, data: *const jv.Object, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
