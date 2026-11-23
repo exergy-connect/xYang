@@ -55,6 +55,10 @@ pub const Options = struct {
     /// Caller promises that all instance strings and schema defaults checked as strings
     /// contain only ASCII. Debug builds assert the promise; a false promise is invalid.
     assume_ascii: bool = false,
+    /// Caller promises that every leafref value has the JSON type of its targets (no `true`
+    /// against `1`, no `1.0` against `1`), so membership skips cross-type comparison.
+    /// Debug builds assert the promise; a false promise is invalid.
+    normalized_json_values: bool = false,
 };
 
 pub const Result = struct {
@@ -99,7 +103,7 @@ pub const YangValidator = struct {
         if ((options.canonical or options.canonical_trusted) and !options.native_json) return u.fail("canonical applies only to native JSON (native_json=True)", .{});
         if ((options.canonical or options.canonical_trusted) and (options.rpc != null or options.action != null)) return u.fail("canonical does not apply to rpc or action instances", .{});
         if (options.rpc != null or options.action != null) return self.collectOperation(u, data, options);
-        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = self.module, .assume_ascii = options.assume_ascii };
+        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = self.module, .assume_ascii = options.assume_ascii, .normalized_json_values = options.normalized_json_values };
         defer checker.deinit();
         var structure: ?*Statement = null;
         var structure_key: []const u8 = "";
@@ -264,7 +268,7 @@ pub const YangValidator = struct {
             }
         }
         const accessible = try operation.accessibleModule(self.a, self.module, target, op_node);
-        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = accessible.module, .assume_ascii = options.assume_ascii };
+        var checker: type_checker.TypeChecker = .{ .a = self.a, .root = accessible.module, .assume_ascii = options.assume_ascii, .normalized_json_values = options.normalized_json_values };
         defer checker.deinit();
         var keys: rfc7951.MemberKeys = .{ .a = self.a, .parent_module = self.module.name };
         var dv: document_validator.DocumentValidator = .{

@@ -7,6 +7,7 @@
 //! (RFC 7950 9.9.2).
 
 const std = @import("std");
+const zig_builtin = @import("builtin");
 const utf8 = @import("../utf8.zig");
 const regex = @import("../xsd_regex.zig");
 const ast = @import("../ast.zig");
@@ -59,6 +60,108 @@ pub const Num = union(enum) {
 
 const Band = struct { lo: ?Num, hi: ?Num };
 
+const LeafrefKey = struct { path: *const xpath.Path, anchor: *const xpath.Node };
+
+/// The data values of a leafref's target nodes, for membership with `pyEql` semantics
+/// except that a boolean never matches a number (`true` is not `1`).
+pub const TargetSet = struct {
+    strings: std.StringHashMapUnmanaged(void) = .empty,
+    bools: [2]bool = .{ false, false },
+    ints: std.AutoHashMapUnmanaged(i128, void) = .empty,
+    /// Floats, decimals, null, arrays and objects, compared one by one.
+    others: std.ArrayList(Val) = .empty,
+    /// The `Class` of every target, as a bit set.
+    classes: u8 = 0,
+
+    const empty: TargetSet = .{};
+
+    const Class = enum(u3) { string, boolean, integer, real, other };
+
+    fn classOf(v: Val) Class {
+        return switch (v) {
+            .string => .string,
+            .bool => .boolean,
+            .int => .integer,
+            .float, .decimal => .real,
+            else => .other,
+        };
+    }
+
+    fn bit(c: Class) u8 {
+        return @as(u8, 1) << @intFromEnum(c);
+    }
+
+    pub fn deinit(self: *TargetSet, a: Allocator) void {
+        self.strings.deinit(a);
+        self.ints.deinit(a);
+        self.others.deinit(a);
+    }
+
+    pub fn add(self: *TargetSet, a: Allocator, v: Val) error{OutOfMemory}!void {
+        self.classes |= bit(classOf(v));
+        switch (v) {
+            .string => |s| try self.strings.put(a, s, {}),
+            .bool => |b| self.bools[@intFromBool(b)] = true,
+            .int => |i| try self.ints.put(a, i, {}),
+            else => try self.others.append(a, v),
+        }
+    }
+
+    /// Whether a target equals `value`, as `pyEql` with booleans apart from numbers.
+    pub fn contains(self: *const TargetSet, value: Val) bool {
+        switch (value) {
+            .string => |s| return self.strings.contains(s),
+            .bool => |b| return self.bools[@intFromBool(b)],
+            .int => |i| return self.ints.contains(i) or self.inOthers(value),
+            .float => |f| {
+                // An integral float below 2^53 equals exactly the int of the same value;
+                // other floats compare with every int as `pyEql` does.
+                if (std.math.isFinite(f) and @floor(f) == f and @abs(f) < 9007199254740992.0) {
+                    if (self.ints.contains(@intFromFloat(f))) return true;
+                } else if (@floor(f) == f and self.inInts(value)) return true;
+                return self.inOthers(value);
+            },
+            .decimal => return self.inInts(value) or self.inOthers(value),
+            else => return self.inOthers(value),
+        }
+    }
+
+    /// `contains` under `normalized_json_values`: a value only meets targets of its own
+    /// JSON type.
+    pub fn containsNormalized(self: *const TargetSet, value: Val) bool {
+        return switch (value) {
+            .string => |s| self.strings.contains(s),
+            .bool => |b| self.bools[@intFromBool(b)],
+            .int => |i| self.ints.contains(i),
+            else => self.inOthers(value),
+        };
+    }
+
+    /// Why `value` breaks the `normalized_json_values` promise against these targets, or
+    /// null when it holds: every target has the value's JSON type.
+    pub fn normalizedViolation(self: *const TargetSet, value: Val) ?[]const u8 {
+        if (self.classes & ~bit(classOf(value)) == 0) return null;
+        return switch (classOf(value)) {
+            .boolean => "a boolean against non-boolean targets",
+            .integer => if (self.classes & bit(.real) != 0) "an integer against float or decimal targets" else "an integer against targets of another type",
+            .real => if (self.classes & bit(.integer) != 0) "a float or decimal against integer targets" else "a float or decimal against targets of another type",
+            .string => "a string against non-string targets",
+            .other => "a non-scalar value against targets of another type",
+        };
+    }
+
+    fn inInts(self: *const TargetSet, value: Val) bool {
+        var it = self.ints.keyIterator();
+        while (it.next()) |i| if (jv.pyEql(value, .{ .int = i.* })) return true;
+        return false;
+    }
+
+    fn inOthers(self: *const TargetSet, value: Val) bool {
+        for (self.others.items) |o| if (jv.pyEql(value, o)) return true;
+        return false;
+    }
+};
+
 pub const TypeChecker = struct {
     a: Allocator,
     regex_scratch: regex.Regex.Scratch = .{},
@@ -80,6 +183,13 @@ pub const TypeChecker = struct {
     enabled: ?*const if_feature_eval.EnabledFeatures = null,
     /// Used when the type has no `scope`.
     feature_module: ?*Module = null,
+    /// Caller promises that every leafref value has the JSON type of its targets: no
+    /// `true` against `1`, no `1.0` against `1`. Debug builds assert the promise.
+    normalized_json_values: bool = false,
+    /// Leafref target values by path and anchor node, for this checker's lifetime. XPath
+    /// nodes are never freed or changed while it lives, so a node pointer names one
+    /// data node.
+    leafref_cache: std.AutoHashMapUnmanaged(LeafrefKey, *TargetSet) = .empty,
 
     pub fn deinit(self: *TypeChecker) void {
         self.regex_scratch.deinit(self.a);
@@ -87,6 +197,13 @@ pub const TypeChecker = struct {
         while (it.next()) |bands| self.a.free(bands.*);
         self.range_cache.deinit(self.a);
         self.range_cache = .empty;
+        var sets = self.leafref_cache.valueIterator();
+        while (sets.next()) |set| {
+            set.*.deinit(self.a);
+            self.a.destroy(set.*);
+        }
+        self.leafref_cache.deinit(self.a);
+        self.leafref_cache = .empty;
     }
 
     fn fail(self: *TypeChecker, err: Error, comptime fmt: []const u8, args: anytype) Error {
@@ -334,22 +451,48 @@ pub const TypeChecker = struct {
         if (!t.requireInstance()) return &.{};
         const expr = t.pathAst() orelse return &.{};
         const path = &expr.path;
-        const path_str = try path.toString(self.a);
         const ctx = try self.context();
         const start = if (path.is_absolute) ctx.root else ctx.current orelse
-            return self.issue("leafref", "Leafref relative path {f} requires context node", .{repr(path_str)});
+            return self.issue("leafref", "Leafref relative path {f} requires context node", .{repr(try path.toString(self.a))});
+        const targets = try self.leafrefTargets(path, ctx, start);
+        if (self.normalized_json_values) {
+            if (zig_builtin.mode == .debug) if (targets.normalizedViolation(value)) |why|
+                std.debug.panic("normalized_json_values violation: leafref value {f} via {s}: {s}", .{ jv.pyRepr(value), try path.toString(self.a), why });
+            if (targets.containsNormalized(value)) return &.{};
+        } else if (targets.contains(value)) return &.{};
+        return self.issue("leafref", "Leafref value {f} not found via path {f} (require-instance is true)", .{ jv.pyRepr(value), repr(try path.toString(self.a)) });
+    }
+
+    /// The values a leafref `path` selects from `start`. Leading `..` and `.` steps reach
+    /// an anchor node, so leafrefs under one parent share the evaluation. A path whose
+    /// remaining steps have no predicate (which could use `current()`) is cached by
+    /// path and anchor.
+    fn leafrefTargets(self: *TypeChecker, path: *const xpath.Path, ctx: xpath.Context, start: *const xpath.Node) Error!*const TargetSet {
+        var anchor = start;
+        var i: usize = 0;
+        while (i < path.segments.len) : (i += 1) {
+            const seg = path.segments[i];
+            if (seg.predicate != null) break;
+            if (std.mem.eql(u8, seg.step, ".")) continue;
+            if (!std.mem.eql(u8, seg.step, "..")) break;
+            anchor = anchor.parent orelse return &TargetSet.empty;
+        }
+        const rest = path.segments[i..];
+        const cacheable = for (rest) |seg| {
+            if (seg.predicate != null) break false;
+        } else true;
+        const key: LeafrefKey = .{ .path = path, .anchor = anchor };
+        if (cacheable) if (self.leafref_cache.get(key)) |set| return set;
         var ev = self.evaluator();
-        const targets = ev.evalPath(path, ctx, start) catch |err| switch (err) {
+        const nodes = ev.evalSegments(rest, ctx, try self.a.dupe(*const xpath.Node, &.{anchor})) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.XPathEval => return self.fail(error.Raised, "{s}", .{ev.message}),
         };
-        for (targets) |n| {
-            // Python-style equality equates booleans with 0 and 1, but a
-            // leafref must not match values of different JSON types.
-            if ((value == .bool) != (n.data == .bool)) continue;
-            if (jv.pyEql(value, n.data)) return &.{};
-        }
-        return self.issue("leafref", "Leafref value {f} not found via path {f} (require-instance is true)", .{ jv.pyRepr(value), repr(path_str) });
+        const set = try self.a.create(TargetSet);
+        set.* = .{};
+        for (nodes) |n| try set.add(self.a, n.data);
+        if (cacheable) try self.leafref_cache.put(self.a, key, set);
+        return set;
     }
 
     fn checkString(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
@@ -726,4 +869,87 @@ test "base64 strictness follows CPython" {
     for ([_][]const u8{ "ab", "ab=", "abc", "a===", "abc==", "ab===", "=abc", "ab=c", "abcd=e", "ab =" }) |bad| {
         try std.testing.expectEqual(@as(?usize, null), base64DecodedLen(bad));
     }
+}
+
+fn leafrefRun(a: Allocator, yang: []const u8, json: []const u8, checker: *TypeChecker) ![]const @import("document_validator.zig").ValidationError {
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a, yang, "test.yang", &diag);
+    var msg: []const u8 = "";
+    const data = try jv.parse(a, json, &msg);
+    checker.* = .{ .a = a, .root = module };
+    var keys: @import("../encoding/rfc7951.zig").MemberKeys = .{ .a = a, .parent_module = module.name };
+    var dv: @import("document_validator.zig").DocumentValidator = .{ .a = a, .module = module, .checker = checker, .keys = &keys, .enabled = try if_feature_eval.buildEnabledFeatures(a, module, null) };
+    return dv.validate(data);
+}
+
+test "absolute leafref targets are evaluated once" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var checker: TypeChecker = undefined;
+    const errors = try leafrefRun(arena.allocator(),
+        "module m { namespace 'urn:m'; prefix m; list lag { key name; leaf name { type string; } } list intf { key name; leaf name { type string; } leaf lag { type leafref { path '/lag/name'; } } } }",
+        "{\"lag\":[{\"name\":\"a\"},{\"name\":\"b\"}],\"intf\":[{\"name\":\"e0\",\"lag\":\"a\"},{\"name\":\"e1\",\"lag\":\"b\"},{\"name\":\"e2\",\"lag\":\"c\"}]}", &checker);
+    defer checker.deinit();
+    try std.testing.expectEqual(@as(usize, 1), errors.len);
+    try std.testing.expectEqualStrings("leafref", errors[0].code);
+    try std.testing.expectEqualStrings("/intf/2/lag", errors[0].pointer);
+    try std.testing.expectEqual(@as(u32, 1), checker.leafref_cache.count());
+}
+
+test "relative leafref targets are shared per anchor, not across containers" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var checker: TypeChecker = undefined;
+    const group = "list lag { key name; leaf name { type string; } } list intf { key name; leaf name { type string; } leaf lag { type leafref { path '../../lag/name'; } } }";
+    const errors = try leafrefRun(arena.allocator(),
+        "module m { namespace 'urn:m'; prefix m; container c1 { " ++ group ++ " } container c2 { " ++ group ++ " } }",
+        "{\"c1\":{\"lag\":[{\"name\":\"a\"}],\"intf\":[{\"name\":\"e0\",\"lag\":\"a\"},{\"name\":\"e1\",\"lag\":\"a\"}]},\"c2\":{\"lag\":[{\"name\":\"b\"}],\"intf\":[{\"name\":\"e0\",\"lag\":\"a\"},{\"name\":\"e1\",\"lag\":\"b\"}]}}", &checker);
+    defer checker.deinit();
+    try std.testing.expectEqual(@as(usize, 1), errors.len);
+    try std.testing.expectEqualStrings("/c2/intf/0/lag", errors[0].pointer);
+    try std.testing.expectEqual(@as(u32, 2), checker.leafref_cache.count());
+}
+
+test "leafref target set keeps booleans apart from numbers" {
+    const a = std.testing.allocator;
+    var ints: TargetSet = .{};
+    defer ints.deinit(a);
+    try ints.add(a, .{ .int = 1 });
+    try std.testing.expect(!ints.contains(.{ .bool = true }));
+    try std.testing.expect(ints.contains(.{ .int = 1 }));
+    var bools: TargetSet = .{};
+    defer bools.deinit(a);
+    try bools.add(a, .{ .bool = true });
+    try std.testing.expect(!bools.contains(.{ .int = 1 }));
+    try std.testing.expect(bools.contains(.{ .bool = true }));
+    try std.testing.expect(!bools.contains(.{ .bool = false }));
+}
+
+test "leafref target set matches numbers as pyEql does" {
+    const a = std.testing.allocator;
+    var set: TargetSet = .{};
+    defer set.deinit(a);
+    try set.add(a, .{ .int = 1 });
+    try set.add(a, .{ .float = 2.5 });
+    try set.add(a, .{ .int = (1 << 60) + 1 });
+    try std.testing.expect(set.contains(.{ .float = 1.0 }));
+    try std.testing.expect(set.contains(.{ .float = 2.5 }));
+    try std.testing.expect(!set.contains(.{ .float = 1.5 }));
+    try std.testing.expect(!set.contains(.{ .int = 2 }));
+    // Above 2^53, pyEql compares an int with a float as floats.
+    try std.testing.expectEqual(jv.pyEql(.{ .float = 0x1p60 }, .{ .int = (1 << 60) + 1 }), set.contains(.{ .float = 0x1p60 }));
+    try std.testing.expect(!set.contains(.{ .string = "1" }));
+}
+
+test "normalized leafref values reject mixed JSON types" {
+    // Debug builds panic with this violation; the check itself is tested here.
+    const a = std.testing.allocator;
+    var set: TargetSet = .{};
+    defer set.deinit(a);
+    try set.add(a, .{ .int = 1 });
+    try std.testing.expect(set.normalizedViolation(.{ .int = 1 }) == null);
+    try std.testing.expect(set.normalizedViolation(.{ .float = 1.0 }) != null);
+    try std.testing.expect(set.normalizedViolation(.{ .bool = true }) != null);
+    try std.testing.expect(set.containsNormalized(.{ .int = 1 }));
+    try std.testing.expect(TargetSet.empty.normalizedViolation(.{ .bool = true }) == null);
 }
