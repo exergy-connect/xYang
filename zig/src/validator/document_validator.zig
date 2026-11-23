@@ -113,6 +113,24 @@ const Location = struct {
     }
 };
 
+/// The canonical check (`Walk.canonicalErrors`) run during the validation walk, so a
+/// claimed-canonical instance is traversed once. Each object the validator enters has its
+/// members checked; the objects below it that the validator never enters (a false `when`
+/// or `if-feature`, a failed structural check) are checked in full when it leaves.
+pub const Canonical = struct {
+    walk: *instance.Walk,
+    issues: std.ArrayList(instance.EncodingIssue) = .empty,
+    /// The root object until the validator enters it.
+    root: ?*const Object,
+    root_schema: ?*const Statement,
+    /// Objects still to be checked, in the order their parents were entered.
+    pending: std.ArrayList(instance.Walk.Descend) = .empty,
+    /// Each pending object: its schema node and whether the validator entered it.
+    state: std.AutoHashMapUnmanaged(*const Object, Entry) = .empty,
+
+    const Entry = struct { stmt: *const Statement, entered: bool = false };
+};
+
 pub const DocumentValidator = struct {
     a: Allocator,
     module: *Module,
@@ -132,6 +150,8 @@ pub const DocumentValidator = struct {
     /// the containing module, like Python's `_typedef_module`.
     module_root: bool = true,
     annotations: @import("../encoding/annotations.zig").Options = .{},
+    /// With `canonical`: the canonical check runs in this walk.
+    canonical: ?*Canonical = null,
 
     fn add(self: *DocumentValidator, path: []const u8, pointer: []const u8, code: []const u8, message: []const u8) error{OutOfMemory}!void {
         try self.errors.append(self.a, .{ .path = path, .pointer = pointer, .code = code, .message = message });
@@ -557,7 +577,41 @@ pub const DocumentValidator = struct {
         return saved;
     }
 
+    const PathPointer = struct {
+        path: *const PathBuilder,
+        pub fn text(self: PathPointer) error{OutOfMemory}![]const u8 {
+            return self.path.pointer();
+        }
+    };
+
     fn visitChildren(self: *DocumentValidator, data: Val, owner: Owner, path: *PathBuilder, enforce: bool, parent: *const XNode) Error!void {
+        const c = self.canonical orelse return self.visitMembers(data, owner, path, enforce, parent);
+        if (data != .object) return self.visitMembers(data, owner, path, enforce, parent);
+        const obj = data.object;
+        // Only objects the canonical check reaches; a case revisits its parent's object.
+        const schema: ?*const Statement = if (c.root == obj) blk: {
+            c.root = null;
+            break :blk c.root_schema;
+        } else blk: {
+            const entry = c.state.getPtr(obj) orelse return self.visitMembers(data, owner, path, enforce, parent);
+            if (entry.entered) return self.visitMembers(data, owner, path, enforce, parent);
+            entry.entered = true;
+            break :blk entry.stmt;
+        };
+        const start = c.pending.items.len;
+        const at: PathPointer = .{ .path = path };
+        var it = obj.iterator();
+        while (it.next()) |e| try c.walk.checkMember(e.key_ptr.*, e.value_ptr.*, schema, at, &c.issues, &c.pending);
+        for (c.pending.items[start..]) |d| try c.state.put(self.a, d.obj, .{ .stmt = d.stmt });
+        try self.visitMembers(data, owner, path, enforce, parent);
+        for (c.pending.items[start..]) |d| {
+            const entry = c.state.fetchRemove(d.obj).?.value;
+            if (!entry.entered) try c.walk.checkChildren(d.stmt, d.obj, try d.pointer(self.a, try path.pointer()), &c.issues);
+        }
+        c.pending.shrinkRetainingCapacity(start);
+    }
+
+    fn visitMembers(self: *DocumentValidator, data: Val, owner: Owner, path: *PathBuilder, enforce: bool, parent: *const XNode) Error!void {
         if (data != .object) return;
         const obj = data.object;
         const child_enforce = childEnforce(owner, enforce);
